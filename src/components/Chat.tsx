@@ -1,71 +1,23 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useRive } from "@rive-app/react-canvas";
-import { apiService } from "../services/api";
-
-interface ChatMessage {
-  id: string;
-  type: "user" | "ai";
-  content: string;
-  timestamp: Date;
-}
+import { useChat } from "../hooks/useChat";
 
 const Chat: React.FC = () => {
   const [message, setMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<
-    "connected" | "disconnected" | "checking"
-  >("checking");
+  const { messages: chatHistory, isLoading, sendMessage } = useChat();
 
   const { RiveComponent } = useRive({
     src: "/bunny.riv",
     autoplay: true,
   });
 
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        await apiService.healthCheck();
-        setConnectionStatus("connected");
-      } catch {
-        setConnectionStatus("disconnected");
-      }
-    };
-    checkConnection();
-  }, []);
-
-  const addMessage = useCallback((type: "user" | "ai", content: string) => {
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      type,
-      content,
-      timestamp: new Date(),
-    };
-    setChatHistory((prev) => [...prev, newMessage]);
-  }, []);
-
   const handleSendMessage = useCallback(async () => {
     if (!message.trim() || isLoading) return;
-
-    const userMessage = message.trim();
+    const text = message.trim();
     setMessage("");
-    addMessage("user", userMessage);
-    setIsLoading(true);
-
-    try {
-      const response = await apiService.sendChatMessage(userMessage);
-      addMessage("ai", response.response);
-      setConnectionStatus("connected");
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      addMessage("ai", `Error: ${errorMessage}`);
-      setConnectionStatus("disconnected");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [message, isLoading, addMessage]);
+    await sendMessage(text);
+  }, [message, isLoading, sendMessage]);
 
   const handleKeyPress = useCallback(
     (e: React.KeyboardEvent) => {
@@ -105,27 +57,6 @@ const Chat: React.FC = () => {
         </Link>
 
         <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-          <div
-            style={{
-              padding: "4px 12px",
-              borderRadius: "12px",
-              fontSize: "12px",
-              backgroundColor:
-                connectionStatus === "connected"
-                  ? "#4CAF50"
-                  : connectionStatus === "disconnected"
-                    ? "#f44336"
-                    : "#ff9800",
-              color: "white",
-            }}
-          >
-            {connectionStatus === "connected"
-              ? "● Connected"
-              : connectionStatus === "disconnected"
-                ? "● Disconnected"
-                : "● Checking..."}
-          </div>
-
           <Link to="/signin">
             <button
               style={{
@@ -278,32 +209,20 @@ const Chat: React.FC = () => {
                 fontSize: "16px",
                 boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
               }}
-              disabled={isLoading || connectionStatus === "disconnected"}
+              disabled={isLoading}
             />
             <button
               onClick={handleSendMessage}
-              disabled={
-                isLoading ||
-                !message.trim() ||
-                connectionStatus === "disconnected"
-              }
+              disabled={isLoading || !message.trim()}
               style={{
                 padding: "12px 25px",
                 backgroundColor:
-                  isLoading ||
-                  !message.trim() ||
-                  connectionStatus === "disconnected"
-                    ? "#ccc"
-                    : "#4CAF50",
+                  isLoading || !message.trim() ? "#ccc" : "#4CAF50",
                 color: "white",
                 border: "none",
                 borderRadius: "25px",
                 cursor:
-                  isLoading ||
-                  !message.trim() ||
-                  connectionStatus === "disconnected"
-                    ? "not-allowed"
-                    : "pointer",
+                  isLoading || !message.trim() ? "not-allowed" : "pointer",
                 fontSize: "16px",
                 minWidth: "80px",
                 boxShadow: "0 2px 4px rgba(0,0,0,0.1)",

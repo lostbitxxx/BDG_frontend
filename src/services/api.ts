@@ -1,71 +1,76 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+// ─── API Configuration ────────────────────────────────────────
+import type { AuthResponse, ChatResponse } from '../types';
 
-export interface ChatMessage {
-  message: string;
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
+// ─── Helpers ─────────────────────────────────────────────────
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('token');
+  return token
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    : { 'Content-Type': 'application/json' };
 }
 
-export interface ChatResponse {
-  success: boolean;
-  response: string;
-  timestamp: string;
+async function post<T>(path: string, body: unknown, auth = false): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: auth ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
 }
 
-export interface ApiError {
-  success: false;
-  error: string;
-  timestamp: string;
-}
-
-class ApiService {
-  private readonly baseURL: string;
-
-  constructor() {
-    this.baseURL = process.env.NODE_ENV === 'production' 
-      ? '/api'  // Vercel API routes
-      : process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-  }
-
-  async sendChatMessage(message: string): Promise<ChatResponse> {
+// ─── Auth ────────────────────────────────────────────────────
+export const authService = {
+  async register(data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${this.baseURL}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await post<AuthResponse>('/api/auth/register', data);
+      if (result.success && result.token && result.user) {
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
       }
-
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Unknown error occurred');
-      }
-
-      return data;
-    } catch (error) {
-      console.error('API Error:', error);
-      throw new Error(
-        error instanceof Error ? error.message : 'Failed to connect to backend'
-      );
+      return result;
+    } catch {
+      return { success: false, error: 'Network error. Please try again.' };
     }
-  }
+  },
 
-  async healthCheck(): Promise<{ status: string; timestamp: string }> {
+  async login(data: { email: string; password: string }): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${this.baseURL.replace('/api', '')}/health`);
-      if (!response.ok) throw new Error('Health check failed');
-      return await response.json();
-    } catch (error) {
-      throw new Error('Backend unavailable');
+      const result = await post<AuthResponse>('/api/auth/login', data);
+      if (result.success && result.token && result.user) {
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+      }
+      return result;
+    } catch {
+      return { success: false, error: 'Network error. Please try again.' };
     }
+  },
+
+  logout(): void {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  },
+
+  getToken: (): string | null => localStorage.getItem('token'),
+
+  getUser() {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  },
+
+  isAuthenticated: (): boolean => !!localStorage.getItem('token')
+};
+
+// ─── Chat ────────────────────────────────────────────────────
+export const chatService = {
+  async sendMessage(message: string): Promise<ChatResponse> {
+    return post<ChatResponse>('/api/chat', { message });
   }
-}
-
-export const apiService = new ApiService();
-
-// Legacy export for backward compatibility
-export const sendChatMessage = (message: string) => apiService.sendChatMessage(message);
+};
