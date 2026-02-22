@@ -2,18 +2,20 @@ import React, { useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useRive } from "@rive-app/react-canvas";
 import { useChat } from "../hooks/useChat";
+import { useCharacter } from "../context/CharacterContext";
 import Header from "./Header";
 import { COLORS } from "../constants";
 
 const Chat: React.FC = () => {
   const [message, setMessage] = useState("");
   const { messages: chatHistory, isLoading, sendMessage } = useChat();
+  const { selected: character } = useCharacter();
   const location = useLocation();
   const welcomeMessage = (location.state as { welcome?: string } | null)
     ?.welcome;
 
   const { RiveComponent } = useRive({
-    src: "/bunny.riv",
+    src: character.file,
     autoplay: true,
   });
 
@@ -38,30 +40,48 @@ const Chat: React.FC = () => {
     <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa" }}>
       <Header />
 
-      {/* Main Content */}
       <div style={{ display: "flex", height: "calc(100vh - 120px)" }}>
-        {/* Rive Character */}
+        {/* Character panel */}
         <div
           style={{
-            width: "400px",
-            height: "400px",
+            width: "280px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
             padding: "20px",
-            border: "2px solid #ddd",
-            borderRadius: "10px",
-            backgroundColor: "white",
-            margin: "20px",
-            boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+            gap: "12px",
             flexShrink: 0,
           }}
         >
-          <RiveComponent style={{ width: "100%", height: "100%" }} />
+          <div
+            style={{
+              width: "240px",
+              height: "240px",
+              border: `2px solid ${COLORS.border}`,
+              borderRadius: "16px",
+              backgroundColor: "white",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+              overflow: "hidden",
+            }}
+          >
+            <RiveComponent style={{ width: "100%", height: "100%" }} />
+          </div>
+          <div
+            style={{
+              fontSize: "15px",
+              fontWeight: "600",
+              color: COLORS.primary,
+            }}
+          >
+            {character.emoji} {character.name}
+          </div>
         </div>
 
         {/* Chat Interface */}
         <div
           style={{
             flex: 1,
-            padding: "20px",
+            padding: "20px 20px 20px 0",
             display: "flex",
             flexDirection: "column",
           }}
@@ -70,7 +90,6 @@ const Chat: React.FC = () => {
             AI Chat
           </h1>
 
-          {/* Welcome banner */}
           {welcomeMessage && (
             <div
               style={{
@@ -88,7 +107,6 @@ const Chat: React.FC = () => {
             </div>
           )}
 
-          {/* Messages */}
           <div
             style={{
               flex: 1,
@@ -110,7 +128,7 @@ const Chat: React.FC = () => {
                   padding: "40px",
                 }}
               >
-                <p>Welcome! Start a conversation with the AI...</p>
+                <p>Welcome! Start a conversation with {character.name}...</p>
                 <p style={{ fontSize: "14px" }}>Ask me anything!</p>
               </div>
             )}
@@ -132,7 +150,9 @@ const Chat: React.FC = () => {
                     color: msg.type === "user" ? "#1976D2" : "#388E3C",
                   }}
                 >
-                  {msg.type === "user" ? "You" : "AI Assistant"}
+                  {msg.type === "user"
+                    ? "You"
+                    : `${character.emoji} ${character.name}`}
                 </div>
                 <div>{msg.content}</div>
                 <div
@@ -151,19 +171,18 @@ const Chat: React.FC = () => {
                   padding: "10px",
                 }}
               >
-                AI is typing... 🤔
+                {character.emoji} {character.name} is typing... 🤔
               </div>
             )}
           </div>
 
-          {/* Input */}
           <div style={{ display: "flex", gap: "10px" }}>
             <input
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message... (Press Enter to send)"
+              placeholder={`Message ${character.name}... (Press Enter to send)`}
               style={{
                 flex: 1,
                 padding: "12px 15px",

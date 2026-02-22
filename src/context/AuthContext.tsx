@@ -32,6 +32,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const login = useCallback((user: User, token: string) => {
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(user));
+    // Sync character from DB into localStorage so CharacterContext reads it
+    if (user.character) {
+      localStorage.setItem("character", user.character);
+    }
     setUser(user);
   }, []);
 

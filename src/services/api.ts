@@ -20,6 +20,15 @@ async function post<T>(path: string, body: unknown, auth = false): Promise<T> {
   return res.json();
 }
 
+async function put<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
 // ─── Auth ────────────────────────────────────────────────────
 export const authService = {
   async register(data: {
@@ -64,7 +73,19 @@ export const authService = {
     return raw ? JSON.parse(raw) : null;
   },
 
-  isAuthenticated: (): boolean => !!localStorage.getItem('token')
+  isAuthenticated: (): boolean => !!localStorage.getItem('token'),
+
+  async updateCharacter(character: 'bunny' | 'cat' | 'owl'): Promise<AuthResponse> {
+    try {
+      const result = await put<AuthResponse>('/api/auth/character', { character });
+      if (result.success && result.user) {
+        localStorage.setItem('user', JSON.stringify(result.user));
+      }
+      return result;
+    } catch {
+      return { success: false, error: 'Failed to update character.' };
+    }
+  }
 };
 
 // ─── Chat ────────────────────────────────────────────────────
