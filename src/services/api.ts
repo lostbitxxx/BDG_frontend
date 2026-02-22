@@ -25,8 +25,7 @@ export const authService = {
   async register(data: {
     email: string;
     password: string;
-    firstName: string;
-    lastName: string;
+    username: string;
   }): Promise<AuthResponse> {
     try {
       const result = await post<AuthResponse>('/api/auth/register', data);

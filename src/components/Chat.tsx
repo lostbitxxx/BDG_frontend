@@ -1,11 +1,16 @@
 import React, { useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useRive } from "@rive-app/react-canvas";
 import { useChat } from "../hooks/useChat";
+import Header from "./Header";
+import { COLORS } from "../constants";
 
 const Chat: React.FC = () => {
   const [message, setMessage] = useState("");
   const { messages: chatHistory, isLoading, sendMessage } = useChat();
+  const location = useLocation();
+  const welcomeMessage = (location.state as { welcome?: string } | null)
+    ?.welcome;
 
   const { RiveComponent } = useRive({
     src: "/bunny.riv",
@@ -31,72 +36,10 @@ const Chat: React.FC = () => {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa" }}>
-      {/* Header */}
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "20px 40px",
-          backgroundColor: "white",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        }}
-      >
-        <Link to="/" style={{ textDecoration: "none" }}>
-          <div
-            style={{
-              fontSize: "28px",
-              fontWeight: "bold",
-              color: "#2c3e50",
-              fontFamily: "'Arial', sans-serif",
-              cursor: "pointer",
-            }}
-          >
-            BoDongGua
-          </div>
-        </Link>
-
-        <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-          <Link to="/signin">
-            <button
-              style={{
-                padding: "12px 24px",
-                fontSize: "16px",
-                backgroundColor: "transparent",
-                color: "#2c3e50",
-                border: "2px solid #2c3e50",
-                borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.3s ease",
-                fontWeight: "500",
-              }}
-            >
-              Sign In
-            </button>
-          </Link>
-
-          <Link to="/signup">
-            <button
-              style={{
-                padding: "12px 24px",
-                fontSize: "16px",
-                backgroundColor: "#3498db",
-                color: "white",
-                border: "2px solid #3498db",
-                borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.3s ease",
-                fontWeight: "500",
-              }}
-            >
-              Sign Up
-            </button>
-          </Link>
-        </div>
-      </header>
+      <Header />
 
       {/* Main Content */}
-      <div style={{ display: "flex", height: "calc(100vh - 100px)" }}>
+      <div style={{ display: "flex", height: "calc(100vh - 120px)" }}>
         {/* Rive Character */}
         <div
           style={{
@@ -108,6 +51,7 @@ const Chat: React.FC = () => {
             backgroundColor: "white",
             margin: "20px",
             boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+            flexShrink: 0,
           }}
         >
           <RiveComponent style={{ width: "100%", height: "100%" }} />
@@ -122,10 +66,29 @@ const Chat: React.FC = () => {
             flexDirection: "column",
           }}
         >
-          <h1 style={{ margin: 0, marginBottom: "20px", color: "#333" }}>
+          <h1 style={{ margin: 0, marginBottom: "12px", color: "#333" }}>
             AI Chat
           </h1>
 
+          {/* Welcome banner */}
+          {welcomeMessage && (
+            <div
+              style={{
+                backgroundColor: "#eafaf1",
+                border: `1px solid ${COLORS.success}`,
+                color: COLORS.success,
+                padding: "10px 16px",
+                borderRadius: "8px",
+                marginBottom: "12px",
+                fontSize: "14px",
+                fontWeight: "500",
+              }}
+            >
+              {welcomeMessage}
+            </div>
+          )}
+
+          {/* Messages */}
           <div
             style={{
               flex: 1,
@@ -193,6 +156,7 @@ const Chat: React.FC = () => {
             )}
           </div>
 
+          {/* Input */}
           <div style={{ display: "flex", gap: "10px" }}>
             <input
               type="text"

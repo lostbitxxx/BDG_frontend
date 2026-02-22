@@ -2,18 +2,17 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { authService } from "../services/api";
 import { COLORS, ROUTES } from "../constants";
+import Header from "./Header";
 
 interface FormData {
-  firstName: string;
-  lastName: string;
+  username: string;
   email: string;
   password: string;
   confirmPassword: string;
 }
 
 interface FormErrors {
-  firstName?: string;
-  lastName?: string;
+  username?: string;
   email?: string;
   password?: string;
   confirmPassword?: string;
@@ -23,8 +22,7 @@ interface FormErrors {
 const SignUp: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>({
-    firstName: "",
-    lastName: "",
+    username: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -37,9 +35,11 @@ const SignUp: React.FC = () => {
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.firstName.trim())
-      newErrors.firstName = "First name is required";
-    if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
+    if (!formData.username.trim()) {
+      newErrors.username = "Username is required";
+    } else if (formData.username.trim().length < 3) {
+      newErrors.username = "Username must be at least 3 characters";
+    }
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -82,15 +82,16 @@ const SignUp: React.FC = () => {
 
     try {
       const result = await authService.register({
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
+        username: formData.username.trim(),
         email: formData.email.trim(),
         password: formData.password,
       });
 
       if (result.success) {
-        navigate(ROUTES.CHAT, {
-          state: { welcome: `Welcome, ${result.user?.firstName}! 🎉` },
+        navigate(ROUTES.SIGNIN, {
+          state: {
+            welcome: `Account created! Welcome, ${result.user?.username}! 🎉`,
+          },
         });
       } else {
         setErrors({
@@ -127,58 +128,19 @@ const SignUp: React.FC = () => {
   const errorStyle: React.CSSProperties = {
     color: COLORS.danger,
     fontSize: "12px",
-    marginTop: "4px",
+    margin: "4px 0 0 0",
   };
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
-      {/* Header */}
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "20px 40px",
-          backgroundColor: "white",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        }}
-      >
-        <Link to={ROUTES.HOME} style={{ textDecoration: "none" }}>
-          <span
-            style={{
-              fontSize: "28px",
-              fontWeight: "bold",
-              color: COLORS.primary,
-            }}
-          >
-            BoDongGua
-          </span>
-        </Link>
-        <Link to={ROUTES.SIGNIN}>
-          <button
-            style={{
-              padding: "10px 20px",
-              fontSize: "15px",
-              backgroundColor: "transparent",
-              color: COLORS.primary,
-              border: `2px solid ${COLORS.primary}`,
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontWeight: "500",
-            }}
-          >
-            Sign In
-          </button>
-        </Link>
-      </header>
-
+      <Header />
       {/* Form */}
       <main
         style={{
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          minHeight: "calc(100vh - 80px)",
+          minHeight: "calc(100vh - 120px)",
           padding: "40px 20px",
         }}
       >
@@ -189,7 +151,7 @@ const SignUp: React.FC = () => {
             borderRadius: "12px",
             boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
             width: "100%",
-            maxWidth: "440px",
+            maxWidth: "420px",
           }}
         >
           <h2
@@ -232,36 +194,20 @@ const SignUp: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} noValidate>
-            {/* First + Last Name */}
-            <div style={{ display: "flex", gap: "12px", marginBottom: "18px" }}>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>First Name *</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  placeholder="Jane"
-                  style={inputStyle(!!errors.firstName)}
-                  disabled={loading}
-                />
-                {errors.firstName && (
-                  <p style={errorStyle}>{errors.firstName}</p>
-                )}
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>Last Name *</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  placeholder="Doe"
-                  style={inputStyle(!!errors.lastName)}
-                  disabled={loading}
-                />
-                {errors.lastName && <p style={errorStyle}>{errors.lastName}</p>}
-              </div>
+            {/* Username */}
+            <div style={{ marginBottom: "18px" }}>
+              <label style={labelStyle}>Username *</label>
+              <input
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                placeholder="e.g. cooluser123"
+                style={inputStyle(!!errors.username)}
+                disabled={loading}
+                autoFocus
+              />
+              {errors.username && <p style={errorStyle}>{errors.username}</p>}
             </div>
 
             {/* Email */}
@@ -320,7 +266,7 @@ const SignUp: React.FC = () => {
                   style={{
                     fontSize: "12px",
                     color: COLORS.muted,
-                    marginTop: "4px",
+                    margin: "4px 0 0 0",
                   }}
                 >
                   Must be 6+ characters with uppercase and lowercase

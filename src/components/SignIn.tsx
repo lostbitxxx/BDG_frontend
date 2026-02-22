@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { authService } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 import { COLORS, ROUTES } from "../constants";
+import Header from "./Header";
 
 interface FormData {
   email: string;
@@ -17,6 +19,7 @@ interface FormErrors {
 const SignIn: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login } = useAuth();
   const [formData, setFormData] = useState<FormData>({
     email: "",
     password: "",
@@ -58,9 +61,10 @@ const SignIn: React.FC = () => {
         email: formData.email.trim(),
         password: formData.password,
       });
-      if (result.success) {
+      if (result.success && result.user && result.token) {
+        login(result.user, result.token);
         navigate(ROUTES.CHAT, {
-          state: { welcome: `Welcome back, ${result.user?.firstName}! 👋` },
+          state: { welcome: `Welcome back, ${result.user.username}! 👋` },
         });
       } else {
         setErrors({
@@ -96,59 +100,18 @@ const SignIn: React.FC = () => {
   const errorStyle: React.CSSProperties = {
     color: COLORS.danger,
     fontSize: "12px",
-    marginTop: "4px",
     margin: "4px 0 0 0",
   };
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
-      {/* Header */}
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "20px 40px",
-          backgroundColor: "white",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        }}
-      >
-        <Link to={ROUTES.HOME} style={{ textDecoration: "none" }}>
-          <span
-            style={{
-              fontSize: "28px",
-              fontWeight: "bold",
-              color: COLORS.primary,
-            }}
-          >
-            BoDongGua
-          </span>
-        </Link>
-        <Link to={ROUTES.SIGNUP}>
-          <button
-            style={{
-              padding: "10px 20px",
-              fontSize: "15px",
-              backgroundColor: COLORS.secondary,
-              color: "white",
-              border: `2px solid ${COLORS.secondary}`,
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontWeight: "500",
-            }}
-          >
-            Sign Up
-          </button>
-        </Link>
-      </header>
-
-      {/* Main */}
+      <Header />
       <main
         style={{
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          minHeight: "calc(100vh - 80px)",
+          minHeight: "calc(100vh - 120px)",
           padding: "40px 20px",
         }}
       >

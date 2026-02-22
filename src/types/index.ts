@@ -3,8 +3,7 @@
 export interface User {
   _id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  username: string;
   isEmailVerified: boolean;
   createdAt: string;
   lastLoginAt?: string;
