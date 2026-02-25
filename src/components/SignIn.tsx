@@ -53,6 +53,7 @@ const SignIn: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!validate()) return;
     setLoading(true);
     setErrors({});
@@ -182,7 +183,7 @@ const SignIn: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={handleSubmit} method="post" noValidate>
             {/* Email */}
             <div style={{ marginBottom: "18px" }}>
               <label style={labelStyle}>Email Address *</label>

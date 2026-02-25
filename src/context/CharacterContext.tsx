@@ -38,6 +38,7 @@ export const CHARACTERS: Character[] = [
 interface CharacterContextType {
   selected: Character;
   setCharacter: (key: CharacterKey) => Promise<void>;
+  syncFromUser: (characterKey: CharacterKey) => void;
 }
 
 const CharacterContext = createContext<CharacterContextType | null>(null);
@@ -59,6 +60,13 @@ export const CharacterProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   });
 
+  // Called by AuthContext on login/logout to immediately switch to the correct character
+  const syncFromUser = (characterKey: CharacterKey) => {
+    const character = resolveCharacter(characterKey);
+    localStorage.setItem("character", characterKey);
+    setSelected(character);
+  };
+
   const setCharacter = async (key: CharacterKey) => {
     const character = resolveCharacter(key);
     // Optimistic update
@@ -72,7 +80,7 @@ export const CharacterProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <CharacterContext.Provider value={{ selected, setCharacter }}>
+    <CharacterContext.Provider value={{ selected, setCharacter, syncFromUser }}>
       {children}
     </CharacterContext.Provider>
   );
