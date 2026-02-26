@@ -8,11 +8,39 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const addMessage = useCallback((type: 'user' | 'ai', content: string) => {
+  const addMessage = useCallback((type: 'user' | 'ai', content: string, audioBase64?: string) => {
     setMessages(prev => [
       ...prev,
-      { id: `${Date.now()}-${type}`, type, content, timestamp: new Date() }
+      { 
+        id: `${Date.now()}-${type}`, 
+        type, 
+        content, 
+        audioBase64,
+        timestamp: new Date() 
+      }
     ]);
+  }, []);
+
+  const playAudio = useCallback((base64: string) => {
+    try {
+      // Convert base64 to audio blob
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'audio/mp3' });
+      const url = URL.createObjectURL(blob);
+      
+      const audio = new Audio(url);
+      audio.play().catch(err => console.error('Audio play error:', err));
+      
+      // Cleanup after playing
+      audio.onended = () => URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Audio decode error:', err);
+    }
   }, []);
 
   const sendMessage = useCallback(async (text: string) => {
@@ -30,7 +58,12 @@ export function useChat() {
     try {
       const res = await chatService.sendMessage(message);
       if (res.success) {
-        addMessage('ai', res.response);
+        addMessage('ai', res.response, res.audioBase64);
+        
+        // Auto-play TTS if available
+        if (res.audioBase64) {
+          setTimeout(() => playAudio(res.audioBase64!), 500);
+        }
       } else {
         addMessage('ai', res.error || 'Something went wrong.');
       }
@@ -40,7 +73,7 @@ export function useChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, addMessage]);
+  }, [isLoading, addMessage, playAudio]);
 
   const clearMessages = useCallback(() => setMessages([]), []);
 

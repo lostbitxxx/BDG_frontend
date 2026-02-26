@@ -151,6 +151,24 @@ const Home: React.FC = () => {
               </button>
             </Link>
           )}
+
+          {/* Mock Test Link */}
+          <Link to={ROUTES.MOCK_TEST}>
+            <button
+              style={{
+                padding: "14px 32px",
+                fontSize: "17px",
+                fontWeight: "600",
+                backgroundColor: "#9b59b6",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                cursor: "pointer",
+              }}
+            >
+              📝 Try Mock Test
+            </button>
+          </Link>
         </div>
       </main>
     </div>

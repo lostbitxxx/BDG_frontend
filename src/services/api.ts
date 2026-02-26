@@ -94,3 +94,47 @@ export const chatService = {
     return post<ChatResponse>('/api/chat', { message });
   }
 };
+
+// ─── Audio ──────────────────────────────────────────────────
+export interface AudioUploadResponse {
+  success: boolean;
+  url?: string;
+  key?: string;
+  size?: number;
+  contentType?: string;
+  error?: string;
+}
+
+export const audioService = {
+  async uploadAudio(audioBlob: Blob, filename: string): Promise<AudioUploadResponse> {
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, filename);
+
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/audio/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        return { 
+          success: false, 
+          error: errorData.error || `Upload failed with status ${res.status}` 
+        };
+      }
+
+      return res.json();
+    } catch (err) {
+      console.error('Upload error:', err);
+      return { success: false, error: 'Failed to upload audio. Please try again.' };
+    }
+  }
+};

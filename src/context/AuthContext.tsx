@@ -7,7 +7,8 @@ import React, {
 } from "react";
 import { authService } from "../services/api";
 import type { User } from "../types";
-import { useCharacter, type CharacterKey } from "./CharacterContext";
+import { useCharacter, type CharacterKey } from "../context/CharacterContext";
+
 
 interface AuthContextType {
   user: User | null;
@@ -22,7 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(() => authService.getUser());
-  const { syncFromUser } = useCharacter();
+  const { setCharacter } = useCharacter();
 
   // Sync state if token becomes invalid/expired
   useEffect(() => {
@@ -36,19 +37,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
       // Sync this account's character immediately
-      syncFromUser((user.character ?? "bunny") as CharacterKey);
+      setCharacter((user.character ?? "bunny") as CharacterKey);
       setUser(user);
     },
-    [syncFromUser],
+    [setCharacter],
   );
 
   const logout = useCallback(() => {
     authService.logout();
     localStorage.removeItem("character");
     // Reset to default character on logout
-    syncFromUser("bunny");
+    setCharacter("bunny");
     setUser(null);
-  }, [syncFromUser]);
+  }, [setCharacter]);
 
   return (
     <AuthContext.Provider

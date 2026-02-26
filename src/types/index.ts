@@ -33,6 +33,7 @@ export interface AuthResponse {
 }
 
 export interface ChatResponse {
+  audioBase64?: string;
   success: boolean;
   response: string;
   timestamp: string;

@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useState } from "react";
-import { authService } from "../services/api";
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-export type CharacterKey = "bunny" | "cat" | "owl";
+export type CharacterKey = 'bunny' | 'cat' | 'owl';
 
 export interface Character {
   key: CharacterKey;
@@ -13,82 +12,63 @@ export interface Character {
 
 export const CHARACTERS: Character[] = [
   {
-    key: "bunny",
-    name: "Bunny",
-    file: "/bunny.riv",
-    emoji: "🐰",
-    description: "Cheerful and energetic — always ready to help!",
+    key: 'bunny',
+    name: 'Bunny',
+    file: '/bunny.riv',
+    emoji: '🐰',
+    description: 'Cheerful and energetic — always ready to help!',
   },
   {
-    key: "cat",
-    name: "Cat",
-    file: "/cat.riv",
-    emoji: "🐱",
-    description: "Cool and clever — gives sharp, witty answers.",
+    key: 'cat',
+    name: 'Cat',
+    file: '/cat.riv',
+    emoji: '🐱',
+    description: 'Cool and clever — gives sharp, witty answers.',
   },
   {
-    key: "owl",
-    name: "Owl",
-    file: "/owl.riv",
-    emoji: "🦉",
-    description: "Wise and calm — thoughtful guidance every time.",
+    key: 'owl',
+    name: 'Owl',
+    file: '/owl.riv',
+    emoji: '🦉',
+    description: 'Wise and calm — thoughtful guidance every time.',
   },
 ];
 
 interface CharacterContextType {
+  character: CharacterKey;
   selected: Character;
-  setCharacter: (key: CharacterKey) => Promise<void>;
+  setCharacter: (key: CharacterKey) => void;
   syncFromUser: (characterKey: CharacterKey) => void;
 }
 
-const CharacterContext = createContext<CharacterContextType | null>(null);
+const CharacterContext = createContext<CharacterContextType>({
+  character: 'bunny',
+  selected: CHARACTERS[0],
+  setCharacter: () => {},
+  syncFromUser: () => {},
+});
 
-const DEFAULT: Character = CHARACTERS[0]!;
-
-function resolveCharacter(key?: string | null): Character {
-  return CHARACTERS.find((c) => c.key === key) ?? DEFAULT;
-}
-
-export const CharacterProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const [selected, setSelected] = useState<Character>(() => {
-    // Prefer DB value stored in user object, fall back to localStorage
-    const user = authService.getUser();
-    return resolveCharacter(
-      user?.character ?? localStorage.getItem("character"),
-    );
-  });
-
-  // Called by AuthContext on login/logout to immediately switch to the correct character
+export function CharacterProvider({ children }: { children: ReactNode }) {
+  const [character, setCharacterState] = useState<CharacterKey>('bunny');
+  const selected = CHARACTERS.find(c => c.key === character) || CHARACTERS[0];
+  
+  const setCharacter = (key: CharacterKey) => {
+    setCharacterState(key);
+  };
+  
   const syncFromUser = (characterKey: CharacterKey) => {
-    const character = resolveCharacter(characterKey);
-    localStorage.setItem("character", characterKey);
-    setSelected(character);
+    setCharacterState(characterKey);
   };
-
-  const setCharacter = async (key: CharacterKey) => {
-    const character = resolveCharacter(key);
-    // Optimistic update
-    setSelected(character);
-    localStorage.setItem("character", key);
-
-    // Persist to DB if logged in
-    if (authService.isAuthenticated()) {
-      await authService.updateCharacter(key);
-    }
-  };
-
+  
   return (
-    <CharacterContext.Provider value={{ selected, setCharacter, syncFromUser }}>
+    <CharacterContext.Provider value={{ character, selected, setCharacter, syncFromUser }}>
       {children}
     </CharacterContext.Provider>
   );
-};
+}
 
-export const useCharacter = (): CharacterContextType => {
-  const ctx = useContext(CharacterContext);
-  if (!ctx)
-    throw new Error("useCharacter must be used inside CharacterProvider");
-  return ctx;
-};
+export function useCharacter() {
+  return useContext(CharacterContext);
+}
+
+export default CharacterContext;
