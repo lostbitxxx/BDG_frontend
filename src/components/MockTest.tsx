@@ -5,6 +5,70 @@ import { audioService } from "../services/api";
 import { getQuestionsBySection, getSampleTest, Question } from "../data/questions";
 import { COLORS } from "../constants";
 
+// PSC Scoring Levels
+// Reference: https://cle.hkust.edu.hk/tests/psc/psc
+// Level 1-A: 97%, Level 1-B: 92%
+// Level 2-A: 87%, Level 2-B: 80%  
+// Level 3-A: 70%, Level 3-B: 60%
+
+export interface PSCScore {
+  overall: number;
+  grade: string;
+  level: string;
+  pass: boolean;
+}
+
+export function calculatePSCScore(overall: number): PSCScore {
+  let grade = '';
+  let level = '';
+  let pass = false;
+
+  if (overall >= 97) {
+    grade = 'A';
+    level = 'Level 1';
+    pass = true;
+  } else if (overall >= 92) {
+    grade = 'B';
+    level = 'Level 1';
+    pass = true;
+  } else if (overall >= 87) {
+    grade = 'A';
+    level = 'Level 2';
+    pass = true;
+  } else if (overall >= 80) {
+    grade = 'B';
+    level = 'Level 2';
+    pass = true;
+  } else if (overall >= 70) {
+    grade = 'A';
+    level = 'Level 3';
+    pass = true;
+  } else if (overall >= 60) {
+    grade = 'B';
+    level = 'Level 3';
+    pass = true;
+  } else {
+    grade = 'C';
+    level = 'Below Level 3';
+    pass = false;
+  }
+
+  return { overall, grade, level, pass };
+}
+
+export function getScoreDescription(grade: string, level: string): string {
+  const descriptions: Record<string, string> = {
+    'Level 1-A': '🌟 Excellent! You have near-native pronunciation.',
+    'Level 1-B': '⭐ Great! You can work in broadcast/media.',
+    'Level 2-A': '📗 Good! You can teach Mandarin in southern China.',
+    'Level 2-B': '📘 Good! Suitable for teaching Chinese.',
+    'Level 3-A': '📙 Fair - Pass for civil service jobs.',
+    'Level 3-B': '📕 Basic - Keep practicing.',
+    'Below Level 3': '📖 Needs more practice.',
+  };
+  return descriptions[`${level}${grade ? '-' + grade : ''}`] || 'Keep practicing!';
+}
+
 const MockTest: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number } | null>(null);
@@ -12,13 +76,13 @@ const MockTest: React.FC = () => {
   const [uploadResult, setUploadResult] = useState<{ success: boolean; url?: string; error?: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [testSection, setTestSection] = useState<1 | 2 | 3 | 4>(4);
+  const [testSection, setTestSection] = useState<1 | 2 | 3 | 4 | 5>(4);
   const [questions, setQuestions] = useState<Question[]>(getQuestionsBySection(4));
   const [showSectionSelect, setShowSectionSelect] = useState(true);
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  const handleSectionSelect = (section: 1 | 2 | 3 | 4) => {
+  const handleSectionSelect = (section: 1 | 2 | 3 | 4 | 5) => {
     setTestSection(section);
     setQuestions(getQuestionsBySection(section));
     setCurrentQuestionIndex(0);
@@ -145,8 +209,8 @@ const MockTest: React.FC = () => {
                 textAlign: "left",
               }}
             >
-              <div style={{ fontWeight: "bold", color: COLORS.primary }}>Section 1: Single Characters</div>
-              <div style={{ color: COLORS.muted, marginTop: "4px" }}>10% - Read 100 single characters</div>
+              <div style={{ fontWeight: "bold", color: COLORS.primary }}>Section 1: Read Single Characters (读单音节字词)</div>
+              <div style={{ color: COLORS.muted, marginTop: "4px" }}>📊 10% - 100 characters (tone + pronunciation)</div>
             </button>
 
             <button
@@ -161,8 +225,8 @@ const MockTest: React.FC = () => {
                 textAlign: "left",
               }}
             >
-              <div style={{ fontWeight: "bold", color: COLORS.primary }}>Section 2: Polysyllabic Words</div>
-              <div style={{ color: COLORS.muted, marginTop: "4px" }}>20% - Read 100 polysyllabic words</div>
+              <div style={{ fontWeight: "bold", color: COLORS.primary }}>Section 2: Read Words (读多音节词语)</div>
+              <div style={{ color: COLORS.muted, marginTop: "4px" }}>📊 20% - 100 polysyllabic words</div>
             </button>
 
             <button
@@ -177,8 +241,8 @@ const MockTest: React.FC = () => {
                 textAlign: "left",
               }}
             >
-              <div style={{ fontWeight: "bold", color: COLORS.primary }}>Section 3: Vocabulary & Grammar</div>
-              <div style={{ color: COLORS.muted, marginTop: "4px" }}>10% - Multiple choice questions</div>
+              <div style={{ fontWeight: "bold", color: COLORS.primary }}>Section 3: Vocabulary & Grammar (选择判断)</div>
+              <div style={{ color: COLORS.muted, marginTop: "4px" }}>📊 10% - Multiple choice</div>
             </button>
 
             <button
@@ -194,8 +258,24 @@ const MockTest: React.FC = () => {
                 color: "white",
               }}
             >
-              <div style={{ fontWeight: "bold" }}>Section 4: Reading Passage ⭐</div>
-              <div style={{ opacity: 0.9, marginTop: "4px" }}>30% - Read a 400-character passage</div>
+              <div style={{ fontWeight: "bold" }}>Section 4: Reading Passage (朗读作品) ⭐</div>
+              <div style={{ opacity: 0.9, marginTop: "4px" }}>📊 30% - Read 400-character passage</div>
+            </button>
+
+            <button
+              onClick={() => handleSectionSelect(5)}
+              style={{
+                padding: "24px",
+                fontSize: "18px",
+                backgroundColor: "white",
+                border: "2px solid #e0e0e0",
+                borderRadius: "12px",
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              <div style={{ fontWeight: "bold", color: COLORS.primary }}>Section 5: Speaking (命题说话) 🎤</div>
+              <div style={{ color: COLORS.muted, marginTop: "4px" }}>📊 30% - 3-minute speech on topic</div>
             </button>
           </div>
         </main>
@@ -368,14 +448,20 @@ const MockTest: React.FC = () => {
 
             {analysisResult.success ? (
               <>
-                {/* Overall Score */}
+                {/* Overall Score - PSC Style */}
                 <div style={{ textAlign: "center", padding: "24px", backgroundColor: "#f8f9fa", borderRadius: "12px", marginBottom: "20px" }}>
-                  <div style={{ fontSize: "14px", color: COLORS.muted, marginBottom: "8px" }}>Overall Score</div>
+                  <div style={{ fontSize: "14px", color: COLORS.muted, marginBottom: "8px" }}>PSC Score</div>
                   <div style={{ fontSize: "64px", fontWeight: "bold", color: getScoreColor(analysisResult.scores?.overall || 0) }}>
-                    {Math.round(analysisResult.scores?.overall || 0)}
+                    {Math.round(analysisResult.scores?.overall || 0)}%
                   </div>
-                  <div style={{ display: "inline-block", padding: "8px 16px", backgroundColor: analysisResult.scores?.pass ? "#e8f5e9" : "#ffebee", borderRadius: "20px", color: analysisResult.scores?.pass ? "#2e7d32" : "#c62828", fontWeight: "600" }}>
-                    {analysisResult.scores?.grade || "N/A"} - {analysisResult.scores?.pass ? "PASSED" : "Keep Practicing"}
+                  <div style={{ display: "inline-block", padding: "8px 16px", backgroundColor: analysisResult.scores?.pass ? "#e8f5e9" : "#ffebee", borderRadius: "20px", color: analysisResult.scores?.pass ? "#2e7d32" : "#c62828", fontWeight: "600", marginBottom: "8px" }}>
+                    {calculatePSCScore(analysisResult.scores?.overall || 0).level} - {calculatePSCScore(analysisResult.scores?.overall || 0).grade}
+                  </div>
+                  <div style={{ display: "block", marginTop: "8px", fontSize: "14px", color: COLORS.muted }}>
+                    {getScoreDescription(
+                      calculatePSCScore(analysisResult.scores?.overall || 0).grade,
+                      calculatePSCScore(analysisResult.scores?.overall || 0).level
+                    )}
                   </div>
                 </div>
 
