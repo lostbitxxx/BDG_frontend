@@ -138,6 +138,9 @@ const MockTest: React.FC = () => {
 
       const result = await analyzeResponse.json();
       console.log('Analysis result:', result);
+      if (result.dev_info) {
+        console.log('Developer info:', result.dev_info);
+      }
       setAnalysisResult(result);
 
     } catch (error) {
@@ -250,15 +253,14 @@ const MockTest: React.FC = () => {
               style={{
                 padding: "24px",
                 fontSize: "18px",
-                backgroundColor: COLORS.primary,
-                border: "2px solid " + COLORS.primary,
+                backgroundColor: "white",
+                border: "2px solid #e0e0e0",
                 borderRadius: "12px",
                 cursor: "pointer",
                 textAlign: "left",
-                color: "white",
               }}
             >
-              <div style={{ fontWeight: "bold" }}>Section 4: Reading Passage (朗读作品) ⭐</div>
+              <div style={{ fontWeight: "bold", color: COLORS.primary }}>Section 4: Reading Passage (朗读作品) ⭐</div>
               <div style={{ opacity: 0.9, marginTop: "4px" }}>📊 30% - Read 400-character passage</div>
             </button>
 
@@ -322,7 +324,7 @@ const MockTest: React.FC = () => {
             fontSize: "28px",
             textAlign: "center",
             padding: "24px",
-            backgroundColor: "#f8f9fa",
+            backgroundColor: "white",
             borderRadius: "12px",
             marginBottom: "16px",
             lineHeight: "1.6",
@@ -375,11 +377,12 @@ const MockTest: React.FC = () => {
             padding: "24px",
             boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
             marginBottom: "24px",
+            textAlign: "center",
           }}>
             <h3 style={{ margin: "0 0 16px 0", color: COLORS.success }}>
               ✅ Recording Complete!
             </h3>
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "16px", justifyContent: "center" }}>
               <div style={{ padding: "12px 16px", backgroundColor: "#e8f5e9", borderRadius: "8px", color: "#2e7d32" }}>
                 ⏱ Duration: {recordedAudio.duration}s
               </div>
@@ -389,7 +392,7 @@ const MockTest: React.FC = () => {
             </div>
 
             {!analysisResult && (
-              <div style={{ display: "flex", gap: "12px" }}>
+              <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
                 <button
                   onClick={handleUpload}
                   disabled={isUploading || isAnalyzing}
@@ -550,6 +553,9 @@ const MockTest: React.FC = () => {
               <div style={{ padding: "16px", backgroundColor: "#ffebee", borderRadius: "8px" }}>
                 <p style={{ color: "#c62828", margin: 0 }}>
                   ❌ Analysis Failed: {analysisResult.error || "Unknown error"}
+                  {analysisResult.dev_info && (
+                    <span> ({analysisResult.dev_info})</span>
+                  )}
                 </p>
               </div>
             )}
