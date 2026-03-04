@@ -1,9 +1,10 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import Header from "./Header";
 import AudioRecorder from "./AudioRecorder";
 import { audioService } from "../services/api";
 import { getQuestionsBySection, getSampleTest, Question } from "../data/questions";
-import { COLORS } from "../constants";
+import { COLORS, ROUTES } from "../constants";
 
 // PSC Scoring Levels
 // Reference: https://cle.hkust.edu.hk/tests/psc/psc
@@ -563,21 +564,56 @@ const MockTest: React.FC = () => {
         )}
 
         {/* Navigation Buttons */}
-        <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "24px" }}>
-          <button
-            onClick={handleRestart}
-            style={{
-              padding: "12px 24px",
-              fontSize: "14px",
-              backgroundColor: "#95a5a6",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-            }}
-          >
-            🔄 Change Section
-          </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", marginTop: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+            <button
+              onClick={handleRestart}
+              style={{
+                padding: "12px 24px",
+                fontSize: "14px",
+                backgroundColor: "#95a5a6",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+              }}
+            >
+              🔄 Change Section
+            </button>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+            <Link to={ROUTES.TAILORED_PRACTICE}>
+              <button
+                style={{
+                  padding: "12px 24px",
+                  fontSize: "14px",
+                  backgroundColor: COLORS.secondary,
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                🎯 Tailored Practice
+              </button>
+            </Link>
+            <Link to={ROUTES.HISTORY}>
+              <button
+                style={{
+                  padding: "12px 24px",
+                  fontSize: "14px",
+                  backgroundColor: "#34495e",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                📖 Past Practices
+              </button>
+            </Link>
+          </div>
         </div>
       </main>
     </div>
