@@ -15,7 +15,8 @@ export const ROUTES = {
   HISTORY: '/history',
   QUESTION: '/question',
   SIGNIN: '/signin',
-  SIGNUP: '/signup'
+  SIGNUP: '/signup',
+  SETTINGS: '/settings'
 } as const;
 
 // ─── Theme ───────────────────────────────────────────────────
