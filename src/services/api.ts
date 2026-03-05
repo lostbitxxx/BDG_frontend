@@ -75,6 +75,22 @@ export const authService = {
 
   isAuthenticated: (): boolean => !!localStorage.getItem('token'),
 
+  async updateUsername(username: string): Promise<{ success: boolean; username?: string; error?: string }> {
+    try {
+      const result = await put<{ success: boolean; username?: string; error?: string }>('/api/auth/username', { username });
+      if (result.success && result.username) {
+        const user = authService.getUser();
+        if (user) {
+          user.username = result.username;
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+      }
+      return result;
+    } catch {
+      return { success: false, error: 'Failed to update username.' };
+    }
+  },
+
   async updateCharacter(character: 'bunny' | 'cat' | 'owl'): Promise<AuthResponse> {
     try {
       const result = await put<AuthResponse>('/api/auth/character', { character });
