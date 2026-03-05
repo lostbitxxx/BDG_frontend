@@ -9,7 +9,7 @@ import { COLORS } from "../constants";
 const Chat: React.FC = () => {
   const [message, setMessage] = useState("");
   const { messages: chatHistory, isLoading, sendMessage } = useChat();
-  const { selected: character } = useCharacter();
+  const { selected: character, affinity, incrementAffinity } = useCharacter();
   const location = useLocation();
   const welcomeMessage = (location.state as { welcome?: string } | null)
     ?.welcome;
@@ -24,7 +24,8 @@ const Chat: React.FC = () => {
     const text = message.trim();
     setMessage("");
     await sendMessage(text);
-  }, [message, isLoading, sendMessage]);
+    incrementAffinity();
+  }, [message, isLoading, sendMessage, incrementAffinity]);
 
   const handleKeyPress = useCallback(
     (e: React.KeyboardEvent) => {
@@ -74,6 +75,35 @@ const Chat: React.FC = () => {
             }}
           >
             {character.emoji} {character.name}
+          </div>
+          <div
+            style={{
+              width: "100%",
+              fontSize: "13px",
+              color: COLORS.muted,
+            }}
+          >
+            Affinity: <strong>{affinity}%</strong>
+            <div
+              style={{
+                marginTop: "4px",
+                width: "100%",
+                height: "6px",
+                borderRadius: "999px",
+                backgroundColor: "#eee",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${affinity}%`,
+                  height: "100%",
+                  borderRadius: "999px",
+                  backgroundColor: COLORS.secondary,
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
           </div>
         </div>
 
