@@ -111,6 +111,39 @@ export const chatService = {
   }
 };
 
+// ─── Tailored Practice ────────────────────────────────────
+export interface GeneratedQuestion {
+  content: string;
+  pinyin: string;
+  type: 'tone' | 'pronunciation' | 'vocabulary' | 'grammar' | 'reading';
+  difficulty: 'easy' | 'medium' | 'hard';
+  hint?: string;
+}
+
+export interface TailoredPracticeResponse {
+  success: boolean;
+  questions?: GeneratedQuestion[];
+  error?: string;
+  generatedFor?: string;
+}
+
+export const tailoredPracticeService = {
+  async generatePractice(params: {
+    userInput?: string;
+    categories?: string[];
+    weaknesses?: string[];
+    historyRecord?: {
+      feedbackEn: string;
+      feedbackZh: string;
+      weaknesses: string[];
+      strengths: string[];
+      overallScore: number;
+    };
+  }): Promise<TailoredPracticeResponse> {
+    return post<TailoredPracticeResponse>('/api/tailored-practice', params);
+  }
+};
+
 // ─── Audio ──────────────────────────────────────────────────
 export interface AudioUploadResponse {
   success: boolean;

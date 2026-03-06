@@ -67,9 +67,10 @@ const Header: React.FC = () => {
 
   const navLinks = isAuthenticated
     ? [
-        { to: ROUTES.SETTINGS, label: "Settings" },
         { to: ROUTES.CHAT, label: "Chat" },
         { to: ROUTES.MOCK_TEST, label: "Mock Test" },
+        { to: ROUTES.TAILORED_PRACTICE, label: "Tailored Practice" },
+        { to: ROUTES.HISTORY, label: "History" },
       ]
     : [];
 
