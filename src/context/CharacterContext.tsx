@@ -34,10 +34,39 @@ export const CHARACTERS: Character[] = [
   },
 ];
 
-const DEFAULT_AFFINITY: Record<CharacterKey, number> = {
-  bunny: 0,
-  cat: 0,
-  owl: 0,
+export const AFFINITY_XP_PER_LEVEL = 20;
+
+export interface AffinityLevelInfo {
+  level: number;
+  label: string;
+  xpInLevel: number;
+  xpNeededForNextLevel: number;
+  xpPerLevel: number;
+}
+
+export function getAffinityLabel(level: number): string {
+  if (level <= 1) return 'Stranger';
+  if (level === 2) return 'Friend';
+  if (level === 3) return 'Close friend';
+  if (level === 4) return 'Best friend';
+  return 'Soulmate';
+}
+
+/** From POST /api/audio/analyze response (backend is source of truth for affinity). */
+export interface AffinityFromBackend {
+  affinityXp: number;
+  affinityLevel: number;
+  affinityXpCurrentLevel?: number;
+  affinityXpNeededForLevel?: number;
+}
+
+/** Default when no backend affinity yet: Level 1, 0 XP, 20 to next. */
+const DEFAULT_AFFINITY_LEVEL_INFO: AffinityLevelInfo = {
+  level: 1,
+  label: getAffinityLabel(1),
+  xpInLevel: 0,
+  xpPerLevel: 20,
+  xpNeededForNextLevel: 20,
 };
 
 interface CharacterContextType {
@@ -45,9 +74,8 @@ interface CharacterContextType {
   selected: Character;
   setCharacter: (key: CharacterKey) => void;
   syncFromUser: (characterKey: CharacterKey) => void;
-  affinity: number;
-  affinityByCharacter: Record<CharacterKey, number>;
-  incrementAffinity: (key?: CharacterKey, delta?: number) => void;
+  affinityLevelInfo: AffinityLevelInfo;
+  setAffinityFromBackend: (key: CharacterKey, data: AffinityFromBackend) => void;
 }
 
 const CharacterContext = createContext<CharacterContextType>({
@@ -55,48 +83,61 @@ const CharacterContext = createContext<CharacterContextType>({
   selected: CHARACTERS[0],
   setCharacter: () => {},
   syncFromUser: () => {},
-  affinity: 0,
-  affinityByCharacter: DEFAULT_AFFINITY,
-  incrementAffinity: () => {},
+  affinityLevelInfo: DEFAULT_AFFINITY_LEVEL_INFO,
+  setAffinityFromBackend: () => {},
 });
 
 export function CharacterProvider({ children }: { children: ReactNode }) {
   const [character, setCharacterState] = useState<CharacterKey>('bunny');
-  const [affinityByCharacter, setAffinityByCharacter] = useState<Record<CharacterKey, number>>(
-    () => {
-      const stored = localStorage.getItem('affinityByCharacter');
-      if (!stored) return DEFAULT_AFFINITY;
-      try {
-        const parsed = JSON.parse(stored) as Partial<Record<CharacterKey, number>>;
-        return { ...DEFAULT_AFFINITY, ...parsed };
-      } catch {
-        return DEFAULT_AFFINITY;
-      }
-    },
-  );
+  const [backendAffinityByCharacter, setBackendAffinityByCharacter] = useState<
+    Partial<Record<CharacterKey, AffinityFromBackend>>
+  >(() => {
+    try {
+      const stored = localStorage.getItem('backendAffinityByCharacter');
+      if (!stored) return {};
+      const parsed = JSON.parse(stored) as Partial<Record<CharacterKey, AffinityFromBackend>>;
+      return parsed ?? {};
+    } catch {
+      return {};
+    }
+  });
+
   const selected = CHARACTERS.find(c => c.key === character) || CHARACTERS[0];
-  const affinity = affinityByCharacter[character] ?? 0;
-  
+  const backendAffinity = backendAffinityByCharacter[character];
+  const affinityLevelInfo: AffinityLevelInfo = backendAffinity
+    ? {
+        level: backendAffinity.affinityLevel,
+        label: getAffinityLabel(backendAffinity.affinityLevel),
+        xpInLevel: backendAffinity.affinityXpCurrentLevel ?? 0,
+        xpPerLevel: backendAffinity.affinityXpNeededForLevel ?? 20,
+        xpNeededForNextLevel: Math.max(
+          0,
+          (backendAffinity.affinityXpNeededForLevel ?? 20) -
+            (backendAffinity.affinityXpCurrentLevel ?? 0)
+        ),
+      }
+    : DEFAULT_AFFINITY_LEVEL_INFO;
+
   const setCharacter = (key: CharacterKey) => {
     setCharacterState(key);
   };
-  
+
   const syncFromUser = (characterKey: CharacterKey) => {
     setCharacterState(characterKey);
   };
 
-  const incrementAffinity = (key: CharacterKey = character, delta = 1) => {
-    setAffinityByCharacter(prev => {
-      const current = prev[key] ?? 0;
-      const next = Math.max(0, Math.min(100, current + delta));
-      return { ...prev, [key]: next };
-    });
+  const setAffinityFromBackend = (key: CharacterKey, data: AffinityFromBackend) => {
+    setBackendAffinityByCharacter(prev => ({ ...prev, [key]: data }));
   };
 
   useEffect(() => {
-    localStorage.setItem('affinityByCharacter', JSON.stringify(affinityByCharacter));
-  }, [affinityByCharacter]);
-  
+    localStorage.setItem('backendAffinityByCharacter', JSON.stringify(backendAffinityByCharacter));
+  }, [backendAffinityByCharacter]);
+
+  useEffect(() => {
+    localStorage.removeItem('affinityByCharacter');
+  }, []);
+
   return (
     <CharacterContext.Provider
       value={{
@@ -104,9 +145,8 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
         selected,
         setCharacter,
         syncFromUser,
-        affinity,
-        affinityByCharacter,
-        incrementAffinity,
+        affinityLevelInfo,
+        setAffinityFromBackend,
       }}
     >
       {children}

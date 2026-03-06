@@ -6,6 +6,8 @@ import { audioService } from "../services/api";
 import { getQuestionsBySection, getSampleTest, Question } from "../data/questions";
 import { COLORS, ROUTES } from "../constants";
 import { useCharacter } from "../context/CharacterContext";
+import { auth } from "../lib/firebase";
+import { signInWithCustomToken } from "firebase/auth";
 
 // PSC Scoring Levels
 // Reference: https://cle.hkust.edu.hk/tests/psc/psc
@@ -72,7 +74,7 @@ export function getScoreDescription(grade: string, level: string): string {
 }
 
 const MockTest: React.FC = () => {
-  const { incrementAffinity } = useCharacter();
+  const { character, setAffinityFromBackend } = useCharacter();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -124,14 +126,33 @@ const MockTest: React.FC = () => {
         return;
       }
 
-      // Step 2: Analyze audio
-      console.log('Calling analyze endpoint with:', uploadResult.url, currentQuestion.content);
-      
-      const analyzeResponse = await fetch('http://localhost:3001/api/audio/analyze', {
+      // Step 2: Analyze audio — backend requires Firebase ID token for affinity/XP
+      const analyzeHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      let idToken: string | null = null;
+      if (auth.currentUser) {
+        idToken = await auth.currentUser.getIdToken();
+      } else {
+        const storedToken = localStorage.getItem('token');
+        if (storedToken) {
+          try {
+            await signInWithCustomToken(auth, storedToken);
+            if (auth.currentUser) {
+              idToken = await auth.currentUser.getIdToken();
+            }
+          } catch (e) {
+            console.warn('Firebase sign-in with stored token failed:', e);
+          }
+        }
+      }
+      if (idToken) {
+        analyzeHeaders['Authorization'] = `Bearer ${idToken}`;
+      }
+      const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const analyzeResponse = await fetch(`${apiBase}/api/audio/analyze`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: analyzeHeaders,
         body: JSON.stringify({
           audioUrl: uploadResult.url,
           expectedText: currentQuestion.content,
@@ -145,8 +166,41 @@ const MockTest: React.FC = () => {
         console.log('Developer info:', result.dev_info);
       }
       setAnalysisResult(result);
-      incrementAffinity();
 
+      // Read affinity from response (top-level, or result.affinity / result.data; support snake_case)
+      const raw =
+        result.affinityLevel != null || result.affinityXp != null
+          ? result
+          : result.affinity && typeof result.affinity === "object"
+            ? result.affinity
+            : result.data && typeof result.data === "object"
+              ? result.data
+              : null;
+      const hasAffinity =
+        raw &&
+        (raw.affinityLevel !== undefined ||
+          raw.affinity_level !== undefined ||
+          raw.affinityXp !== undefined ||
+          raw.affinity_xp !== undefined);
+      if (hasAffinity) {
+        const level = Number(
+          raw.affinityLevel ?? raw.affinity_level ?? raw.level ?? 1
+        );
+        const xp = Number(raw.affinityXp ?? raw.affinity_xp ?? raw.xp ?? 0);
+        const payload = {
+          affinityXp: xp,
+          affinityLevel: Math.max(1, level),
+          affinityXpCurrentLevel:
+            raw.affinityXpCurrentLevel ??
+            raw.affinity_xp_current_level ??
+            raw.xpInLevel,
+          affinityXpNeededForLevel:
+            raw.affinityXpNeededForLevel ??
+            raw.affinity_xp_needed_for_level ??
+            raw.xpPerLevel,
+        };
+        setAffinityFromBackend(character, payload);
+      }
     } catch (error) {
       console.error('Error:', error);
       setUploadResult({ success: false, error: 'Upload or analysis failed' });
@@ -470,6 +524,11 @@ const MockTest: React.FC = () => {
                       calculatePSCScore(analysisResult.scores?.overall || 0).level
                     )}
                   </div>
+                  {analysisResult.affinityXpAwarded != null && (
+                    <div style={{ marginTop: "12px", fontSize: "16px", fontWeight: "600", color: COLORS.secondary }}>
+                      +{analysisResult.affinityXpAwarded} XP
+                    </div>
+                  )}
                 </div>
 
                 {/* Score Breakdown */}
