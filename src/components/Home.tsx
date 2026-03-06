@@ -61,7 +61,7 @@ const Home: React.FC = () => {
           }}
         >
           {isAuthenticated ? (
-            <Link to={ROUTES.CHAT}>
+            <Link to={ROUTES.MOCK_TEST}>
               <button
                 style={{
                   padding: "14px 28px",
@@ -74,7 +74,7 @@ const Home: React.FC = () => {
                   cursor: "pointer",
                 }}
               >
-                Chat with Companion
+                Start PSC Mock Test
               </button>
             </Link>
           ) : (
