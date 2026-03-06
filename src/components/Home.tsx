@@ -47,59 +47,51 @@ const Home: React.FC = () => {
             lineHeight: 1.6,
           }}
         >
-          The Putonghua Proficiency Test (PSC) is tough for Cantonese speakers—Grade 2B pass rates sit around 45%. 
-          BoDongGua gives you AI-driven mock tests, tailored practice for your weak spots, and a learning companion so you can improve systematically.
+          The Putonghua Proficiency Test (PSC) is tough for Cantonese
+          speakers—Grade 2B pass rates sit around 45%. BoDongGua gives you
+          AI-driven mock tests, tailored practice for your weak spots, and a
+          learning companion so you can improve systematically.
         </p>
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
-          <Link to={ROUTES.MOCK_TEST}>
-            <button
-              style={{
-                padding: "14px 28px",
-                fontSize: "16px",
-                fontWeight: 600,
-                backgroundColor: COLORS.secondary,
-                color: "white",
-                border: "none",
-                borderRadius: "9999px",
-                cursor: "pointer",
-              }}
-            >
-              Start a Test
-            </button>
-          </Link>
-          {!isAuthenticated && (
-            <Link to={ROUTES.SIGNUP}>
-              <button
-                style={{
-                  padding: "14px 28px",
-                  fontSize: "16px",
-                  fontWeight: 600,
-                  backgroundColor: "white",
-                  color: COLORS.secondary,
-                  border: `2px solid ${COLORS.secondary}`,
-                  borderRadius: "9999px",
-                  cursor: "pointer",
-                }}
-              >
-                Get Started — It's Free
-              </button>
-            </Link>
-          )}
-          {isAuthenticated && (
+        <div
+          style={{
+            display: "flex",
+            gap: "12px",
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          {isAuthenticated ? (
             <Link to={ROUTES.CHAT}>
               <button
                 style={{
                   padding: "14px 28px",
                   fontSize: "16px",
                   fontWeight: 600,
-                  backgroundColor: "white",
-                  color: COLORS.secondary,
-                  border: `2px solid ${COLORS.secondary}`,
+                  backgroundColor: COLORS.secondary,
+                  color: "white",
+                  border: "none",
                   borderRadius: "9999px",
                   cursor: "pointer",
                 }}
               >
                 Chat with Companion
+              </button>
+            </Link>
+          ) : (
+            <Link to={ROUTES.SIGNUP}>
+              <button
+                style={{
+                  padding: "14px 28px",
+                  fontSize: "16px",
+                  fontWeight: 600,
+                  backgroundColor: COLORS.secondary,
+                  color: "white",
+                  border: "none",
+                  borderRadius: "9999px",
+                  cursor: "pointer",
+                }}
+              >
+                Get Started — It's Free
               </button>
             </Link>
           )}
@@ -125,8 +117,16 @@ const Home: React.FC = () => {
         >
           How BoDongGua helps
         </h2>
-        <p style={{ textAlign: "center", color: COLORS.muted, maxWidth: 560, margin: "0 auto 40px" }}>
-          Built for PSC-style practice with real-time feedback and progress you can track.
+        <p
+          style={{
+            textAlign: "center",
+            color: COLORS.muted,
+            maxWidth: 560,
+            margin: "0 auto 40px",
+          }}
+        >
+          Built for PSC-style practice with real-time feedback and progress you
+          can track.
         </p>
 
         <div
@@ -161,15 +161,28 @@ const Home: React.FC = () => {
             >
               <span style={{ fontSize: "24px" }}>🎭</span>
             </div>
-            <h3 style={{ fontSize: "18px", fontWeight: 600, color: COLORS.primary, marginBottom: "8px" }}>
+            <h3
+              style={{
+                fontSize: "18px",
+                fontWeight: 600,
+                color: COLORS.primary,
+                marginBottom: "8px",
+              }}
+            >
               Interactive learning companions
             </h3>
-            <p style={{ fontSize: "14px", color: COLORS.muted, lineHeight: 1.5, margin: 0 }}>
-              Choose a character that fits your style. Your companion stays with you during practice, gives feedback after each session, and tracks your progress over time.
+            <p
+              style={{
+                fontSize: "14px",
+                color: COLORS.muted,
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              Choose a character that fits your style. Your companion stays with
+              you during practice, gives feedback after each session, and tracks
+              your progress over time.
             </p>
-            <Link to={ROUTES.CHOOSE_CHARACTER} style={{ display: "inline-block", marginTop: "12px", fontSize: "14px", fontWeight: 600, color: COLORS.secondary }}>
-              Choose your character →
-            </Link>
           </div>
 
           <div
@@ -194,15 +207,28 @@ const Home: React.FC = () => {
             >
               <span style={{ fontSize: "24px" }}>📝</span>
             </div>
-            <h3 style={{ fontSize: "18px", fontWeight: 600, color: COLORS.primary, marginBottom: "8px" }}>
+            <h3
+              style={{
+                fontSize: "18px",
+                fontWeight: 600,
+                color: COLORS.primary,
+                marginBottom: "8px",
+              }}
+            >
               Mock test & tailored practice
             </h3>
-            <p style={{ fontSize: "14px", color: COLORS.muted, lineHeight: 1.5, margin: 0 }}>
-              Take PSC-style mock tests by section. After each session, get AI-generated tailored practice focused on your weak areas—syllables, tones, vocabulary—so you improve faster.
+            <p
+              style={{
+                fontSize: "14px",
+                color: COLORS.muted,
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              Take PSC-style mock tests by section. After each session, get
+              AI-generated tailored practice focused on your weak
+              areas—syllables, tones, vocabulary—so you improve faster.
             </p>
-            <Link to={ROUTES.MOCK_TEST} style={{ display: "inline-block", marginTop: "12px", fontSize: "14px", fontWeight: 600, color: COLORS.secondary }}>
-              Start a test →
-            </Link>
           </div>
 
           <div
@@ -227,41 +253,55 @@ const Home: React.FC = () => {
             >
               <span style={{ fontSize: "24px" }}>🎤</span>
             </div>
-            <h3 style={{ fontSize: "18px", fontWeight: 600, color: COLORS.primary, marginBottom: "8px" }}>
+            <h3
+              style={{
+                fontSize: "18px",
+                fontWeight: 600,
+                color: COLORS.primary,
+                marginBottom: "8px",
+              }}
+            >
               Real-time pronunciation feedback
             </h3>
-            <p style={{ fontSize: "14px", color: COLORS.muted, lineHeight: 1.5, margin: 0 }}>
-              Record your answers and get section-by-section scores and feedback. Focus on tones, retroflex initials, and nasal finals without expensive tutoring.
+            <p
+              style={{
+                fontSize: "14px",
+                color: COLORS.muted,
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              Record your answers and get section-by-section scores and
+              feedback. Focus on tones, retroflex initials, and nasal finals
+              without expensive tutoring.
             </p>
-            <Link to={ROUTES.MOCK_TEST} style={{ display: "inline-block", marginTop: "12px", fontSize: "14px", fontWeight: 600, color: COLORS.secondary }}>
-              Try mock test →
-            </Link>
           </div>
         </div>
       </section>
 
       {/* CTA */}
-      <section style={{ ...SECTION_STYLE, paddingTop: "48px", paddingBottom: "64px" }}>
-        <p style={{ fontSize: "18px", color: COLORS.muted, marginBottom: "20px" }}>
-          {isAuthenticated ? "Jump back into practice or chat with your companion." : "Create a free account to save progress and unlock your learning companion."}
+      <section
+        style={{ ...SECTION_STYLE, paddingTop: "48px", paddingBottom: "64px" }}
+      >
+        <p
+          style={{
+            fontSize: "18px",
+            color: COLORS.muted,
+            marginBottom: "20px",
+          }}
+        >
+          {isAuthenticated
+            ? "Jump back into practice or chat with your companion."
+            : "Create a free account to save progress and unlock your learning companion."}
         </p>
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
-          <Link to={ROUTES.MOCK_TEST}>
-            <button
-              style={{
-                padding: "12px 24px",
-                fontSize: "15px",
-                fontWeight: 600,
-                backgroundColor: COLORS.secondary,
-                color: "white",
-                border: "none",
-                borderRadius: "9999px",
-                cursor: "pointer",
-              }}
-            >
-              Start a Test
-            </button>
-          </Link>
+        <div
+          style={{
+            display: "flex",
+            gap: "12px",
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
           {isAuthenticated ? (
             <Link to={ROUTES.CHAT}>
               <button
@@ -269,9 +309,9 @@ const Home: React.FC = () => {
                   padding: "12px 24px",
                   fontSize: "15px",
                   fontWeight: 600,
-                  backgroundColor: "white",
-                  color: COLORS.secondary,
-                  border: `2px solid ${COLORS.secondary}`,
+                  backgroundColor: COLORS.secondary,
+                  color: "white",
+                  border: "none",
                   borderRadius: "9999px",
                   cursor: "pointer",
                 }}

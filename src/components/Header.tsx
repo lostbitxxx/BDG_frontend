@@ -245,19 +245,39 @@ const Header: React.FC = () => {
                     Start a Test
                   </button>
                 </Link>
+                <button
+                  type="button"
+                  className="header-logout-btn"
+                  onClick={() => {
+                    logout();
+                    navigate(ROUTES.HOME);
+                  }}
+                  style={{
+                    padding: "8px 24px",
+                    borderRadius: "9999px",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    background: "transparent",
+                    border: `2px solid ${COLORS.border}`,
+                    color: "#4b5563",
+                    transition: "border-color 0.3s, background 0.3s",
+                  }}
+                >
+                  Sign Out
+                </button>
               </>
             ) : (
               <>
                 <Link to={ROUTES.SIGNIN}>
                   <button style={secondaryBtnStyle}>Sign In</button>
                 </Link>
-                <Link to={ROUTES.MOCK_TEST}>
+                <Link to={ROUTES.SIGNUP}>
                   <button
                     type="button"
                     className="header-start-test-btn"
                     style={startTestBtnStyle}
                   >
-                    Start a Test
+                    Sign Up
                   </button>
                 </Link>
               </>
@@ -426,19 +446,40 @@ const Header: React.FC = () => {
                 <Link to={ROUTES.SIGNIN} onClick={() => handleMobileToggle()}>
                   <button style={secondaryBtnStyle}>Sign In</button>
                 </Link>
-                <Link
-                  to={ROUTES.MOCK_TEST}
-                  onClick={() => handleMobileToggle()}
-                >
+                <Link to={ROUTES.SIGNUP} onClick={() => handleMobileToggle()}>
                   <button
                     type="button"
                     className="header-start-test-btn"
                     style={startTestBtnStyle}
                   >
-                    Start a Test
+                    Sign Up
                   </button>
                 </Link>
               </>
+            )}
+            {isAuthenticated && (
+              <button
+                type="button"
+                className="header-logout-btn"
+                onClick={() => {
+                  handleMobileToggle();
+                  logout();
+                  navigate(ROUTES.HOME);
+                }}
+                style={{
+                  padding: "12px 24px",
+                  borderRadius: "9999px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  background: "transparent",
+                  border: `2px solid ${COLORS.border}`,
+                  color: "#4b5563",
+                  transition: "border-color 0.3s, background 0.3s",
+                  width: "100%",
+                }}
+              >
+                Sign Out
+              </button>
             )}
           </div>
         )}
