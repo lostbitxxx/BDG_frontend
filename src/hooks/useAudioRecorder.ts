@@ -24,7 +24,7 @@ const getMediaRecorder = () => {
   return window.MediaRecorder as typeof MediaRecorder;
 };
 
-export function useAudioRecorder() {
+export function useAudioRecorder(onRecordingStart?: () => void, maxDuration?: number, onDurationChange?: (duration: number) => void) {
   const [state, setState] = useState<AudioRecorderState>({
     isRecording: false,
     isPaused: false,
@@ -122,10 +122,25 @@ export function useAudioRecorder() {
 
       mediaRecorder.start(100);
       setState(prev => ({ ...prev, isRecording: true, duration: 0 }));
+      
+      // Notify parent that recording started
+      if (onRecordingStart) onRecordingStart();
 
       // Start timer
       timerRef.current = setInterval(() => {
-        setState(prev => ({ ...prev, duration: prev.duration + 1 }));
+        setState(prev => {
+          // Auto-stop if maxDuration reached
+          if (maxDuration && prev.duration >= maxDuration) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+              mediaRecorderRef.current.stop();
+            }
+            return prev;
+          }
+          const newDuration = prev.duration + 1;
+          if (onDurationChange) onDurationChange(newDuration);
+          return { ...prev, duration: newDuration };
+        });
       }, 1000);
 
     } catch (err) {

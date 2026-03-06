@@ -82,17 +82,40 @@ const MockTest: React.FC = () => {
   const [testSection, setTestSection] = useState<1 | 2 | 3 | 4 | 5>(4);
   const [questions, setQuestions] = useState<Question[]>(getQuestionsBySection(4));
   const [showSectionSelect, setShowSectionSelect] = useState(true);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+  const isSectionMode = testSection === 1 || testSection === 2;
+  const isChoiceMode = testSection === 3;
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  const handleSectionSelect = (section: 1 | 2 | 3 | 4 | 5) => {
+  const handleSectionSelect = async (section: 1 | 2 | 3 | 4 | 5) => {
     setTestSection(section);
-    setQuestions(getQuestionsBySection(section));
-    setCurrentQuestionIndex(0);
     setShowSectionSelect(false);
+    setCurrentQuestionIndex(0);
     setAnalysisResult(null);
     setRecordedAudio(null);
     setUploadResult(null);
+    
+    // Generate questions using AI
+    setIsLoadingQuestions(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/questions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section, count: section <= 2 ? 100 : section === 3 ? 25 : 5 })
+      });
+      const data = await response.json();
+      if (data.success && data.questions) {
+        setQuestions(data.questions);
+      } else {
+        setQuestions(getQuestionsBySection(section));
+      }
+    } catch (error) {
+      console.error('Failed to generate questions:', error);
+      setQuestions(getQuestionsBySection(section));
+    } finally {
+      setIsLoadingQuestions(false);
+    }
   };
 
   const handleRecordingComplete = (blob: Blob, duration: number) => {
@@ -189,6 +212,122 @@ const MockTest: React.FC = () => {
     if (score >= 80) return '#2ecc71';
     if (score >= 70) return '#f39c12';
     return '#e74c3c';
+  };
+
+  // Section Mode UI for Sections 1 & 2 - Single recording for all 100 words
+  const SectionModeUI = () => {
+    const rows = [];
+    for (let i = 0; i < questions.length; i += 5) {
+      rows.push(questions.slice(i, i + 5));
+    }
+
+    return (
+      <div style={{ width: "100%" }}>
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+          <h1 style={{ color: COLORS.primary, marginBottom: "8px" }}>
+            📝 {testSection === 1 ? '讀單音節字 (100 words)' : '讀多音節詞語 (100 words)'}
+          </h1>
+          {isLoadingQuestions && (
+            <div style={{ color: COLORS.primary, marginTop: "8px", fontWeight: "bold" }}>
+              🤖 Loading questions...
+            </div>
+          )}
+        </div>
+
+        {/* Words Grid */}
+        {!isLoadingQuestions && (
+        <div style={{
+          backgroundColor: "white",
+          borderRadius: "16px",
+          padding: "24px",
+          marginBottom: "24px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+        }}>
+          <div style={{ marginBottom: "16px", fontWeight: "bold", color: COLORS.primary }}>
+            Words to Read ({questions.length} words):
+          </div>
+          
+          {rows.map((row, rowIdx) => (
+            <div key={rowIdx} style={{ 
+              display: "flex", 
+              justifyContent: "center", 
+              gap: "12px", 
+              marginBottom: "12px",
+              flexWrap: "wrap"
+            }}>
+              {row.map((q: any) => (
+                <div key={q.id} style={{
+                  width: "100px",
+                  padding: "12px 8px",
+                  backgroundColor: "#f8f9fa",
+                  borderRadius: "8px",
+                  textAlign: "center",
+                  border: "2px solid #e0e0e0",
+                }}>
+                  <div style={{ fontSize: "20px", fontWeight: "bold", color: "#333" }}>
+                    {q.content}
+                  </div>
+                  <div style={{ fontSize: "12px", color: COLORS.muted }}>
+                    {q.pinyin || ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        )}
+
+        {/* Audio Recorder */}
+        {!isLoadingQuestions && (
+        <div style={{ textAlign: "center" }}>
+          {recordedAudio ? (
+            <div style={{ padding: "20px", backgroundColor: "#e8f5e9", borderRadius: "12px", display: "inline-block" }}>
+              <span style={{ fontSize: "24px", color: "#2e7d32", fontWeight: "bold" }}>
+                ✅ Recording Complete! ({recordedAudio.duration}s)
+              </span>
+            </div>
+          ) : (
+            <AudioRecorder onRecordingComplete={(blob, duration) => setRecordedAudio({ blob, duration })} />
+          )}
+        </div>
+        )}
+
+        {/* Upload & Results */}
+        {recordedAudio && !analysisResult && (
+          <div style={{ textAlign: "center", marginTop: "20px" }}>
+            <button
+              onClick={handleUpload}
+              disabled={isUploading || isAnalyzing}
+              style={{
+                padding: "14px 32px",
+                fontSize: "16px",
+                backgroundColor: isUploading || isAnalyzing ? "#95a5a6" : COLORS.primary,
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: isUploading || isAnalyzing ? "not-allowed" : "pointer",
+              }}
+            >
+              {isUploading ? "Uploading..." : isAnalyzing ? "Analyzing..." : "🎤 Analyze Recording"}
+            </button>
+          </div>
+        )}
+
+        {/* Results */}
+        {analysisResult && analysisResult.success && (
+          <div style={{ textAlign: "center", marginTop: "20px", padding: "24px", backgroundColor: "white", borderRadius: "16px" }}>
+            <h2 style={{ color: COLORS.primary }}>📊 Results</h2>
+            <div style={{ fontSize: "48px", fontWeight: "bold", color: getScoreColor(analysisResult.scores?.overall || 0) }}>
+              {Math.round(analysisResult.scores?.overall || 0)}
+            </div>
+            <div style={{ color: "#666" }}>
+              {analysisResult.scores?.level}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (showSectionSelect) {
@@ -292,7 +431,14 @@ const MockTest: React.FC = () => {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
       <Header />
-      <main style={{ padding: "40px 20px", maxWidth: "800px", margin: "0 auto" }}>
+      <main style={{ padding: "40px 20px", maxWidth: "1200px", margin: "0 auto" }}>
+        
+        {/* Section 1 & 2: Single Recording Mode */}
+        {isSectionMode && !showSectionSelect && <SectionModeUI />}
+
+        {/* Other sections or loading */}
+        {!isSectionMode && !showSectionSelect && (
+        <>
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <h1 style={{ color: COLORS.primary, marginBottom: "8px" }}>
@@ -301,6 +447,11 @@ const MockTest: React.FC = () => {
           <div style={{ color: COLORS.muted }}>
             Question {currentQuestionIndex + 1} of {questions.length}
           </div>
+          {isLoadingQuestions && (
+            <div style={{ color: COLORS.primary, marginTop: "8px", fontWeight: "bold" }}>
+              🤖 AI generating questions...
+            </div>
+          )}
         </div>
 
         {/* Question Card */}
@@ -618,6 +769,8 @@ const MockTest: React.FC = () => {
             </Link>
           </div>
         </div>
+        </>
+        )}
       </main>
     </div>
   );

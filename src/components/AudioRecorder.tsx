@@ -4,9 +4,12 @@ import { COLORS } from '../constants';
 
 interface AudioRecorderProps {
   onRecordingComplete?: (blob: Blob, duration: number) => void;
+  onRecordingStart?: () => void;
+  onDurationChange?: (duration: number) => void;
+  maxDuration?: number; // Maximum recording duration in seconds
 }
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) => {
+const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, onRecordingStart, onDurationChange, maxDuration }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const {
     isRecording,
@@ -20,7 +23,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
     pauseRecording,
     resumeRecording,
     resetRecording,
-  } = useAudioRecorder();
+  } = useAudioRecorder(onRecordingStart, maxDuration, onDurationChange);
 
   // Notify parent when recording is complete - only when recording stops and we have audio
   const prevBlobRef = useRef<Blob | null>(null);
