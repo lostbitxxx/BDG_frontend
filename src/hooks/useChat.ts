@@ -43,12 +43,12 @@ export function useChat() {
     }
   }, []);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string): Promise<boolean> => {
     const message = text.trim();
-    if (!message || isLoading) return;
+    if (!message || isLoading) return false;
     if (message.length > CHAT.MAX_MESSAGE_LENGTH) {
       setError(`Message too long (max ${CHAT.MAX_MESSAGE_LENGTH} characters)`);
-      return;
+      return false;
     }
 
     setError(null);
@@ -64,12 +64,15 @@ export function useChat() {
         if (res.audioBase64) {
           setTimeout(() => playAudio(res.audioBase64!), 500);
         }
+        return true;
       } else {
         addMessage('ai', res.error || 'Something went wrong.');
+        return false;
       }
     } catch {
       addMessage('ai', 'Unable to connect. Please try again.');
       setError('Connection error');
+      return false;
     } finally {
       setIsLoading(false);
     }

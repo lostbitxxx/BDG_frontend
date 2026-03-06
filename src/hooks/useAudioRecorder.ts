@@ -11,14 +11,17 @@ export interface AudioRecorderState {
   error: string | null;
 }
 
-// Use polyfill for Safari
+// Use polyfill for Safari and guard for non-browser environments
 const getMediaRecorder = () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
   // @ts-ignore
-  if (typeof window !== 'undefined' && window.MediaRecorder === undefined) {
+  if (window.MediaRecorder === undefined) {
     // @ts-ignore
     window.MediaRecorder = AudioRecorderPolyfill;
   }
-  return window.MediaRecorder;
+  return window.MediaRecorder as typeof MediaRecorder;
 };
 
 export function useAudioRecorder() {
@@ -46,6 +49,18 @@ export function useAudioRecorder() {
       setState(prev => ({ ...prev, error: null }));
 
       const MediaRecorderClass = getMediaRecorder();
+      if (!MediaRecorderClass) {
+        throw new Error('MediaRecorder is not supported in this environment.');
+      }
+
+      if (
+        typeof navigator === 'undefined' ||
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
+        throw new Error('Audio recording is not supported in this browser.');
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
