@@ -5,6 +5,7 @@ import AudioRecorder from "./AudioRecorder";
 import { audioService } from "../services/api";
 import { getQuestionsBySection, getSampleTest, Question } from "../data/questions";
 import { COLORS, ROUTES } from "../constants";
+import { useCharacter } from "../context/CharacterContext";
 
 // PSC Scoring Levels
 // Reference: https://cle.hkust.edu.hk/tests/psc/psc
@@ -71,6 +72,7 @@ export function getScoreDescription(grade: string, level: string): string {
 }
 
 const MockTest: React.FC = () => {
+  const { incrementAffinity } = useCharacter();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -143,6 +145,7 @@ const MockTest: React.FC = () => {
         console.log('Developer info:', result.dev_info);
       }
       setAnalysisResult(result);
+      incrementAffinity();
 
     } catch (error) {
       console.error('Error:', error);

@@ -9,7 +9,7 @@ import { COLORS } from "../constants";
 const Chat: React.FC = () => {
   const [message, setMessage] = useState("");
   const { messages: chatHistory, isLoading, sendMessage } = useChat();
-  const { selected: character, affinity, incrementAffinity } = useCharacter();
+  const { selected: character, affinity } = useCharacter();
   const location = useLocation();
   const welcomeMessage = (location.state as { welcome?: string } | null)
     ?.welcome;
@@ -24,8 +24,7 @@ const Chat: React.FC = () => {
     const text = message.trim();
     setMessage("");
     await sendMessage(text);
-    incrementAffinity();
-  }, [message, isLoading, sendMessage, incrementAffinity]);
+  }, [message, isLoading, sendMessage]);
 
   const handleKeyPress = useCallback(
     (e: React.KeyboardEvent) => {
