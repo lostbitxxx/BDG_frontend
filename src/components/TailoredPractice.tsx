@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "./Header";
 import AudioRecorder from "./AudioRecorder";
+import FloatingChatButton from "./FloatingChatButton";
 import { COLORS, ROUTES } from "../constants";
 import { savePracticeRecord, TestRecord } from "../services/testHistory";
 import { tailoredPracticeService, GeneratedQuestion } from "../services/api";
@@ -260,6 +261,7 @@ const TailoredPractice: React.FC = () => {
     return (
       <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
         <Header />
+        <FloatingChatButton />
         <main style={{ padding: "24px 20px", maxWidth: "700px", margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
             <button
