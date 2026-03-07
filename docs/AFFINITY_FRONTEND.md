@@ -27,6 +27,6 @@ The backend maps exercise score to `affinityXpAwarded` (e.g. 5–50). The exact 
    - Use `affinityXpCurrentLevel` / `affinityXpNeededForLevel` for the “progress to next level” bar when provided.
 
 3. **Context**
-   - `CharacterContext` keeps only `backendAffinityByCharacter` (persisted to `localStorage` under `backendAffinityByCharacter`). When present for the current character, `affinityLevelInfo` is derived from backend data; otherwise the **default** is Level 1, Stranger, 0 XP, 20 XP to next level. There is no legacy affinity system.
+   - `CharacterContext` keeps only `backendAffinityByCharacter` (persisted to `localStorage` under `backendAffinityByCharacter`). When present for the current character, `affinityLevelInfo` is derived from backend data; otherwise the **default** is Level 1, Stranger, 0 XP, 100 XP to next level. There is no legacy affinity system.
 
 Same analyze call and auth; the UI and context use only this system.

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { authService } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { useCharacter } from "../context/CharacterContext";
 import { COLORS, ROUTES } from "../constants";
 import Header from "./Header";
 
@@ -20,6 +21,7 @@ const SignIn: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  const { setCharacter, setAffinityFromAuth } = useCharacter();
   const [formData, setFormData] = useState<FormData>({
     email: "",
     password: "",
@@ -64,6 +66,14 @@ const SignIn: React.FC = () => {
       });
       if (result.success && result.user && result.token) {
         login(result.user, result.token);
+        setCharacter((result.user.character ?? "bunny") as "bunny" | "cat" | "owl");
+        const authRes = result as { affinityXp?: number; affinityLevel?: number };
+        if (authRes.affinityXp !== undefined || authRes.affinityLevel !== undefined) {
+          setAffinityFromAuth({
+            affinityXp: Math.max(0, Number(authRes.affinityXp ?? 0)),
+            affinityLevel: Math.max(1, Math.min(5, Number(authRes.affinityLevel ?? 1))),
+          });
+        }
         navigate(ROUTES.CHAT, {
           state: { welcome: `Welcome back, ${result.user.username}! 👋` },
         });

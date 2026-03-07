@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { useAuth } from './AuthContext';
+import { authService } from '../services/api';
 
 export type CharacterKey = 'bunny' | 'cat' | 'owl';
 
@@ -34,11 +36,14 @@ export const CHARACTERS: Character[] = [
   },
 ];
 
-export const AFFINITY_XP_PER_LEVEL = 20;
+/** Total XP needed to reach each level (backend affinity config). */
+export const AFFINITY_LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000] as const;
+export const AFFINITY_MAX_LEVEL = 5;
 
 export interface AffinityLevelInfo {
   level: number;
   label: string;
+  totalXp: number;
   xpInLevel: number;
   xpNeededForNextLevel: number;
   xpPerLevel: number;
@@ -52,6 +57,28 @@ export function getAffinityLabel(level: number): string {
   return 'Soulmate';
 }
 
+/** Derive level and progress from total XP using backend thresholds. */
+export function getAffinityProgressFromTotalXp(totalXp: number): {
+  level: number;
+  xpInLevel: number;
+  xpPerLevel: number;
+  xpNeededForNextLevel: number;
+} {
+  const t = Math.max(0, Math.floor(totalXp));
+  const thresholds = AFFINITY_LEVEL_THRESHOLDS;
+  let level = 1;
+  for (let i = 1; i < thresholds.length; i++) {
+    if (t >= thresholds[i]) level = i + 1;
+  }
+  level = Math.min(level, AFFINITY_MAX_LEVEL);
+  const currentThreshold = thresholds[level - 1];
+  const nextThreshold = level < AFFINITY_MAX_LEVEL ? thresholds[level] : thresholds[thresholds.length - 1];
+  const xpInLevel = t - currentThreshold;
+  const xpPerLevel = nextThreshold - currentThreshold;
+  const xpNeededForNextLevel = level >= AFFINITY_MAX_LEVEL ? 0 : nextThreshold - t;
+  return { level, xpInLevel, xpPerLevel, xpNeededForNextLevel };
+}
+
 /** From POST /api/audio/analyze response (backend is source of truth for affinity). */
 export interface AffinityFromBackend {
   affinityXp: number;
@@ -60,13 +87,14 @@ export interface AffinityFromBackend {
   affinityXpNeededForLevel?: number;
 }
 
-/** Default when no backend affinity yet: Level 1, 0 XP, 20 to next. */
+/** Default when no backend affinity yet: Level 1, 0 total XP, 100 to next level. */
 const DEFAULT_AFFINITY_LEVEL_INFO: AffinityLevelInfo = {
   level: 1,
   label: getAffinityLabel(1),
+  totalXp: 0,
   xpInLevel: 0,
-  xpPerLevel: 20,
-  xpNeededForNextLevel: 20,
+  xpPerLevel: 100,
+  xpNeededForNextLevel: 100,
 };
 
 interface CharacterContextType {
@@ -76,6 +104,8 @@ interface CharacterContextType {
   syncFromUser: (characterKey: CharacterKey) => void;
   affinityLevelInfo: AffinityLevelInfo;
   setAffinityFromBackend: (key: CharacterKey, data: AffinityFromBackend) => void;
+  /** Set affinity for the whole user (e.g. from login/verify response). */
+  setAffinityFromAuth: (data: AffinityFromBackend) => void;
 }
 
 const CharacterContext = createContext<CharacterContextType>({
@@ -85,37 +115,117 @@ const CharacterContext = createContext<CharacterContextType>({
   syncFromUser: () => {},
   affinityLevelInfo: DEFAULT_AFFINITY_LEVEL_INFO,
   setAffinityFromBackend: () => {},
+  setAffinityFromAuth: () => {},
 });
 
+const AFFINITY_STORAGE_KEY_PREFIX = 'backendAffinityByCharacter';
+
+function getAffinityStorageKey(userId: string | undefined): string {
+  return userId ? `${AFFINITY_STORAGE_KEY_PREFIX}_${userId}` : `${AFFINITY_STORAGE_KEY_PREFIX}_guest`;
+}
+
+function loadAffinityFromStorage(storageKey: string): Partial<Record<CharacterKey, AffinityFromBackend>> {
+  try {
+    const stored = localStorage.getItem(storageKey);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored) as Partial<Record<CharacterKey, AffinityFromBackend>>;
+    return parsed ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function loadAffinityForUser(storageKey: string): Partial<Record<CharacterKey, AffinityFromBackend>> {
+  let data = loadAffinityFromStorage(storageKey);
+  if (Object.keys(data).length === 0 && storageKey !== `${AFFINITY_STORAGE_KEY_PREFIX}_guest`) {
+    const legacy = loadAffinityFromStorage(AFFINITY_STORAGE_KEY_PREFIX);
+    if (Object.keys(legacy).length > 0) data = legacy;
+  }
+  return data;
+}
+
 export function CharacterProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const userId = user?._id;
+  const storageKey = getAffinityStorageKey(userId);
+
   const [character, setCharacterState] = useState<CharacterKey>('bunny');
   const [backendAffinityByCharacter, setBackendAffinityByCharacter] = useState<
     Partial<Record<CharacterKey, AffinityFromBackend>>
-  >(() => {
-    try {
-      const stored = localStorage.getItem('backendAffinityByCharacter');
-      if (!stored) return {};
-      const parsed = JSON.parse(stored) as Partial<Record<CharacterKey, AffinityFromBackend>>;
-      return parsed ?? {};
-    } catch {
-      return {};
+  >(() => (
+    userId ? loadAffinityFromStorage(storageKey) : loadAffinityForUser(storageKey)
+  ));
+
+  const prevStorageKeyRef = useRef<string | null>(null);
+  const lastSetFromTestRef = useRef<number>(0);
+
+  // When user changes: logout -> clear affinity; login -> fetch from API then fall back to localStorage
+  useEffect(() => {
+    if (prevStorageKeyRef.current === storageKey) return;
+    prevStorageKeyRef.current = storageKey;
+    lastSetFromTestRef.current = 0; // reset when user actually changes so we do apply API data for new user
+
+    if (!userId) {
+      // Logout: clear affinity so we never show the previous user's XP
+      setBackendAffinityByCharacter({});
+      return;
     }
-  });
+
+    // Login or switch user: fetch affinity from API (getAffinity or verify), then fall back to localStorage
+    let cancelled = false;
+    const applyAffinity = (affinityXp?: number, affinityLevel?: number) => {
+      if (affinityXp !== undefined || affinityLevel !== undefined) {
+        const totalXp = Math.max(0, Number(affinityXp ?? 0));
+        const level = Math.max(1, Math.min(5, Number(affinityLevel ?? 1)));
+        const data: AffinityFromBackend = { affinityXp: totalXp, affinityLevel: level };
+        setBackendAffinityByCharacter({ bunny: data, cat: data, owl: data });
+      } else {
+        setBackendAffinityByCharacter(loadAffinityFromStorage(storageKey));
+      }
+    };
+    authService.getAffinity()
+      .then((res) => {
+        if (cancelled) return;
+        if (Date.now() - lastSetFromTestRef.current < 15000) return;
+        if (res.success && (res.affinityXp !== undefined || res.affinityLevel !== undefined)) {
+          applyAffinity(res.affinityXp, res.affinityLevel);
+          return;
+        }
+        return authService.verify();
+      })
+      .then((res) => {
+        if (res == null || cancelled) return;
+        if (Date.now() - lastSetFromTestRef.current < 15000) return;
+        if (res.affinityXp !== undefined || res.affinityLevel !== undefined) {
+          applyAffinity(res.affinityXp, res.affinityLevel);
+        } else {
+          setBackendAffinityByCharacter(loadAffinityFromStorage(storageKey));
+        }
+      })
+      .catch(() => {
+        if (!cancelled && Date.now() - lastSetFromTestRef.current >= 15000) {
+          setBackendAffinityByCharacter(loadAffinityFromStorage(storageKey));
+        }
+      });
+    return () => { cancelled = true; };
+  }, [storageKey, userId]);
 
   const selected = CHARACTERS.find(c => c.key === character) || CHARACTERS[0];
   const backendAffinity = backendAffinityByCharacter[character];
+  // Derive level and progress from total XP using backend thresholds (0, 100, 300, 600, 1000)
   const affinityLevelInfo: AffinityLevelInfo = backendAffinity
-    ? {
-        level: backendAffinity.affinityLevel,
-        label: getAffinityLabel(backendAffinity.affinityLevel),
-        xpInLevel: backendAffinity.affinityXpCurrentLevel ?? 0,
-        xpPerLevel: backendAffinity.affinityXpNeededForLevel ?? 20,
-        xpNeededForNextLevel: Math.max(
-          0,
-          (backendAffinity.affinityXpNeededForLevel ?? 20) -
-            (backendAffinity.affinityXpCurrentLevel ?? 0)
-        ),
-      }
+    ? (() => {
+        const totalXp = Math.max(0, Number(backendAffinity.affinityXp ?? 0));
+        const progress = getAffinityProgressFromTotalXp(totalXp);
+        return {
+          level: progress.level,
+          label: getAffinityLabel(progress.level),
+          totalXp,
+          xpInLevel: progress.xpInLevel,
+          xpPerLevel: progress.xpPerLevel,
+          xpNeededForNextLevel: progress.xpNeededForNextLevel,
+        };
+      })()
     : DEFAULT_AFFINITY_LEVEL_INFO;
 
   const setCharacter = (key: CharacterKey) => {
@@ -127,12 +237,17 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
   };
 
   const setAffinityFromBackend = (key: CharacterKey, data: AffinityFromBackend) => {
+    lastSetFromTestRef.current = Date.now(); // so the fetch effect won't overwrite this with stale API data
     setBackendAffinityByCharacter(prev => ({ ...prev, [key]: data }));
   };
 
+  const setAffinityFromAuth = (data: AffinityFromBackend) => {
+    setBackendAffinityByCharacter({ bunny: data, cat: data, owl: data });
+  };
+
   useEffect(() => {
-    localStorage.setItem('backendAffinityByCharacter', JSON.stringify(backendAffinityByCharacter));
-  }, [backendAffinityByCharacter]);
+    localStorage.setItem(storageKey, JSON.stringify(backendAffinityByCharacter));
+  }, [storageKey, backendAffinityByCharacter]);
 
   useEffect(() => {
     localStorage.removeItem('affinityByCharacter');
@@ -147,6 +262,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
         syncFromUser,
         affinityLevelInfo,
         setAffinityFromBackend,
+        setAffinityFromAuth,
       }}
     >
       {children}

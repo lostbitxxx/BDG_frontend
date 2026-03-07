@@ -2,16 +2,15 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "./Header";
 import { useAuth } from "../context/AuthContext";
-import { COLORS, ROUTES } from "../constants";
 import {
   useCharacter,
   CHARACTERS,
   type CharacterKey,
+  type Character,
 } from "../context/CharacterContext";
+import { COLORS, ROUTES } from "../constants";
 import { authService } from "../services/api";
 import { useRive } from "@rive-app/react-canvas";
-import type { Character } from "../context/CharacterContext";
-
 // ── Character card (same as ChooseCharacter) ──────────────────
 const CharacterCard: React.FC<{
   character: Character;
@@ -104,6 +103,7 @@ const Settings: React.FC = () => {
 
   const handleSignOut = () => {
     logout();
+    setCharacter("bunny");
     navigate(ROUTES.HOME);
   };
 

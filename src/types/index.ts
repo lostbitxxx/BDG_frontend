@@ -30,6 +30,9 @@ export interface AuthResponse {
   token?: string;
   error?: string;
   message?: string;
+  /** Affinity from backend (login/verify may return these) */
+  affinityXp?: number;
+  affinityLevel?: number;
 }
 
 export interface ChatResponse {

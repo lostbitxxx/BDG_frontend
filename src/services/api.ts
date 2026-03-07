@@ -29,6 +29,14 @@ async function put<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'GET',
+    headers: getAuthHeaders()
+  });
+  return res.json();
+}
+
 // ─── Auth ────────────────────────────────────────────────────
 export const authService = {
   async register(data: {
@@ -100,6 +108,26 @@ export const authService = {
       return result;
     } catch {
       return { success: false, error: 'Failed to update character.' };
+    }
+  },
+
+  /** Fetch current user's affinity (XP, level) from backend. */
+  async getAffinity(): Promise<{ success: boolean; affinityXp?: number; affinityLevel?: number; affinityStage?: string; error?: string }> {
+    try {
+      const result = await get<{ success: boolean; affinityXp?: number; affinityLevel?: number; affinityStage?: string; error?: string }>('/api/auth/affinity');
+      return result;
+    } catch {
+      return { success: false, error: 'Failed to load affinity.' };
+    }
+  },
+
+  /** Verify token and get current user + affinity (fallback when getAffinity is not available). */
+  async verify(): Promise<{ success: boolean; user?: { _id: string; email?: string; username?: string; character?: string }; affinityXp?: number; affinityLevel?: number; error?: string }> {
+    try {
+      const result = await get<{ success: boolean; user?: unknown; affinityXp?: number; affinityLevel?: number; error?: string }>('/api/auth/verify');
+      return result;
+    } catch {
+      return { success: false, error: 'Verify failed.' };
     }
   }
 };
