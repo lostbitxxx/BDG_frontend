@@ -77,7 +77,7 @@ const TailoredPractice: React.FC = () => {
 
   const mapWeaknessesToCategories = (weaknesses: string[]): string[] => {
     const categoryMap: Record<string, string[]> = {
-      'Single Characters': ['tone_1', 'tone_2', 'tone_3', 'tone_4', 'retroflex', 'nasal'],
+      'Single Characters': ['tone_1', 'tone_2', 'tone_3', 'tone_4', 'retroflex', 'zcs_vs_zhchsh', 'nasal'],
       'Polysyllabic Words': ['tone_1', 'tone_2', 'tone_3', 'tone_4', 'third_tone', 'an_vs_ang'],
       'Vocabulary & Grammar': ['classifier', 'passive_ba', 'le_structure'],
       'Reading Passage': ['tone_1', 'tone_2', 'tone_3', 'tone_4', 'neutral_tone'],
