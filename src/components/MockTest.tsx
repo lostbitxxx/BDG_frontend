@@ -6,6 +6,8 @@ import { audioService } from "../services/api";
 import { getQuestionsBySection, Question } from "../data/questions";
 import { COLORS, ROUTES } from "../constants";
 import { useCharacter } from "../context/CharacterContext";
+import { auth } from "../lib/firebase";
+import { signInWithCustomToken } from "firebase/auth";
 import { saveTestRecord, analyzeStrengthsWeaknesses, TestSectionScore } from "../services/testHistory";
 
 // PSC Section Time Limits (in seconds)
@@ -72,6 +74,193 @@ export function getScoreDescription(grade: string, level: string): string {
   return descriptions[`${level}${grade ? '-' + grade : ''}`] || 'Keep practicing!';
 }
 
+const MockTest: React.FC = () => {
+  const { character, setAffinityFromBackend } = useCharacter();
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{ success: boolean; url?: string; error?: string } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [testSection, setTestSection] = useState<1 | 2 | 3 | 4 | 5>(4);
+  const [questions, setQuestions] = useState<Question[]>(getQuestionsBySection(4));
+  const [showSectionSelect, setShowSectionSelect] = useState(true);
+
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const handleSectionSelect = (section: 1 | 2 | 3 | 4 | 5) => {
+    setTestSection(section);
+    setQuestions(getQuestionsBySection(section));
+    setCurrentQuestionIndex(0);
+    setShowSectionSelect(false);
+    setAnalysisResult(null);
+    setRecordedAudio(null);
+    setUploadResult(null);
+  };
+
+  const handleRecordingComplete = (blob: Blob, duration: number) => {
+    console.log('Recording complete!', duration, 'seconds');
+    setRecordedAudio({ blob, duration });
+    setUploadResult(null);
+    setAnalysisResult(null);
+  };
+
+  const handleUpload = async () => {
+    if (!recordedAudio) return;
+
+    setIsUploading(true);
+    setIsAnalyzing(true);
+    setUploadResult(null);
+    setAnalysisResult(null);
+
+    try {
+      // Step 1: Upload audio
+      const uploadResult = await audioService.uploadAudio(
+        recordedAudio.blob,
+        `recording-${Date.now()}.webm`
+      );
+
+      setUploadResult(uploadResult);
+
+      if (!uploadResult.success || !uploadResult.url) {
+        setIsAnalyzing(false);
+        return;
+      }
+
+      // Step 2: Analyze audio — backend requires Firebase ID token for affinity/XP
+      const analyzeHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      let idToken: string | null = null;
+      if (auth.currentUser) {
+        idToken = await auth.currentUser.getIdToken();
+      } else {
+        const storedToken = localStorage.getItem('token');
+        if (storedToken) {
+          try {
+            await signInWithCustomToken(auth, storedToken);
+            if (auth.currentUser) {
+              idToken = await auth.currentUser.getIdToken();
+            }
+          } catch (e) {
+            console.warn('Firebase sign-in with stored token failed:', e);
+          }
+        }
+      }
+      if (idToken) {
+        analyzeHeaders['Authorization'] = `Bearer ${idToken}`;
+      }
+      const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const analyzeResponse = await fetch(`${apiBase}/api/audio/analyze`, {
+        method: 'POST',
+        headers: analyzeHeaders,
+        body: JSON.stringify({
+          audioUrl: uploadResult.url,
+          expectedText: currentQuestion.content,
+          section: testSection
+        }),
+      });
+
+      const result = await analyzeResponse.json();
+      console.log('Analysis result:', result);
+      if (result.dev_info) {
+        console.log('Developer info:', result.dev_info);
+      }
+      setAnalysisResult(result);
+
+      // Read affinity from response (top-level, or result.affinity / result.data; support snake_case)
+      const raw =
+        result.affinityLevel != null || result.affinityXp != null
+          ? result
+          : result.affinity && typeof result.affinity === "object"
+            ? result.affinity
+            : result.data && typeof result.data === "object"
+              ? result.data
+              : null;
+      const hasAffinity =
+        raw &&
+        (raw.affinityLevel !== undefined ||
+          raw.affinity_level !== undefined ||
+          raw.affinityXp !== undefined ||
+          raw.affinity_xp !== undefined);
+      if (hasAffinity) {
+        const level = Number(
+          raw.affinityLevel ?? raw.affinity_level ?? raw.level ?? 1
+        );
+        const xp = Number(raw.affinityXp ?? raw.affinity_xp ?? raw.xp ?? 0);
+        const payload = {
+          affinityXp: xp,
+          affinityLevel: Math.max(1, level),
+          affinityXpCurrentLevel:
+            raw.affinityXpCurrentLevel ??
+            raw.affinity_xp_current_level ??
+            raw.xpInLevel,
+          affinityXpNeededForLevel:
+            raw.affinityXpNeededForLevel ??
+            raw.affinity_xp_needed_for_level ??
+            raw.xpPerLevel,
+        };
+        setAffinityFromBackend(character, payload);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setUploadResult({ success: false, error: 'Upload or analysis failed' });
+    } finally {
+      setIsUploading(false);
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleReRecord = () => {
+    setRecordedAudio(null);
+    setUploadResult(null);
+    setAnalysisResult(null);
+  };
+
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      handleReRecord();
+    }
+  };
+
+  const handlePrevQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+      handleReRecord();
+    }
+  };
+
+  const handleRestart = () => {
+    setShowSectionSelect(true);
+    setCurrentQuestionIndex(0);
+    setRecordedAudio(null);
+    setUploadResult(null);
+    setAnalysisResult(null);
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return '#27ae60';
+    if (score >= 80) return '#2ecc71';
+    if (score >= 70) return '#f39c12';
+    return '#e74c3c';
+  };
+
+  if (showSectionSelect) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
+        <Header />
+        <main style={{ padding: "40px 20px", maxWidth: "800px", margin: "0 auto" }}>
+          <h1 style={{ textAlign: "center", color: COLORS.primary, marginBottom: "8px" }}>
+            📝 Mock Test - Select Section
+          </h1>
+          <p style={{ textAlign: "center", color: COLORS.muted, marginBottom: "32px" }}>
+            Choose a section to practice
+          </p>
+
+          <div style={{ display: "grid", gap: "16px" }}>
+            <button
+              onClick={() => handleSectionSelect(1)}
 // Full Test Component - Left side
 const FullTest: React.FC<{
   onStartSection: (section: 1 | 2 | 3 | 4 | 5) => void;
@@ -714,6 +903,39 @@ const QuestionPage: React.FC<{
                   <div style={{ fontSize: "64px", fontWeight: "bold", color: getScoreColor(analysisResult.scores?.overall || 0) }}>{Math.round(analysisResult.scores?.overall || 0)}%</div>
                   <div style={{ display: "inline-block", padding: "8px 16px", backgroundColor: analysisResult.scores?.pass ? "#e8f5e9" : "#ffebee", borderRadius: "20px", color: analysisResult.scores?.pass ? "#2e7d32" : "#c62828", fontWeight: "600" }}>
                     {calculatePSCScore(analysisResult.scores?.overall || 0).level} - {calculatePSCScore(analysisResult.scores?.overall || 0).grade}
+                  </div>
+                  <div style={{ display: "block", marginTop: "8px", fontSize: "14px", color: COLORS.muted }}>
+                    {getScoreDescription(
+                      calculatePSCScore(analysisResult.scores?.overall || 0).grade,
+                      calculatePSCScore(analysisResult.scores?.overall || 0).level
+                    )}
+                  </div>
+                  {analysisResult.affinityXpAwarded != null && (
+                    <div style={{ marginTop: "12px", fontSize: "16px", fontWeight: "600", color: COLORS.secondary }}>
+                      +{analysisResult.affinityXpAwarded} XP
+                    </div>
+                  )}
+                </div>
+
+                {/* Score Breakdown */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                  <div style={{ textAlign: "center", padding: "16px", backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
+                    <div style={{ fontSize: "12px", color: COLORS.muted }}>Pronunciation</div>
+                    <div style={{ fontSize: "28px", fontWeight: "bold", color: getScoreColor(analysisResult.scores?.pronunciation || 0) }}>
+                      {Math.round(analysisResult.scores?.pronunciation || 0)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "center", padding: "16px", backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
+                    <div style={{ fontSize: "12px", color: COLORS.muted }}>Tone</div>
+                    <div style={{ fontSize: "28px", fontWeight: "bold", color: getScoreColor(analysisResult.scores?.tone || 0) }}>
+                      {Math.round(analysisResult.scores?.tone || 0)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "center", padding: "16px", backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
+                    <div style={{ fontSize: "12px", color: COLORS.muted }}>Fluency</div>
+                    <div style={{ fontSize: "28px", fontWeight: "bold", color: getScoreColor(analysisResult.scores?.fluency || 0) }}>
+                      {Math.round(analysisResult.scores?.fluency || 0)}
+                    </div>
                   </div>
                 </div>
                 {analysisResult.scores && (

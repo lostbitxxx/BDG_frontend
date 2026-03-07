@@ -9,7 +9,8 @@ import { COLORS } from "../constants";
 const Chat: React.FC = () => {
   const [message, setMessage] = useState("");
   const { messages: chatHistory, isLoading, sendMessage } = useChat();
-  const { selected: character, affinity } = useCharacter();
+  const { selected: character, affinityLevelInfo } = useCharacter();
+  const { level, label, xpInLevel, xpNeededForNextLevel, xpPerLevel } = affinityLevelInfo;
   const location = useLocation();
   const welcomeMessage = (location.state as { welcome?: string } | null)
     ?.welcome;
@@ -82,7 +83,12 @@ const Chat: React.FC = () => {
               color: COLORS.muted,
             }}
           >
-            Affinity: <strong>{affinity}%</strong>
+            <strong>{label}</strong> (Level {level})
+            {xpNeededForNextLevel > 0 ? (
+              <> · <strong>{xpNeededForNextLevel}</strong> XP to next level</>
+            ) : (
+              <> · Max level</>
+            )}
             <div
               style={{
                 marginTop: "4px",
@@ -95,7 +101,7 @@ const Chat: React.FC = () => {
             >
               <div
                 style={{
-                  width: `${affinity}%`,
+                  width: `${(xpInLevel / xpPerLevel) * 100}%`,
                   height: "100%",
                   borderRadius: "999px",
                   backgroundColor: COLORS.secondary,
