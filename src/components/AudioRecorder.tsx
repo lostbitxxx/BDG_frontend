@@ -1,13 +1,84 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { COLORS } from '../constants';
 
 interface AudioRecorderProps {
   onRecordingComplete?: (blob: Blob, duration: number) => void;
+  onRecordingStart?: () => void;
+  onDurationChange?: (duration: number) => void;
+  maxDuration?: number; // Maximum recording duration in seconds
 }
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) => {
+const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, onRecordingStart, onDurationChange, maxDuration }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  const isVisualizingRef = useRef(false);
+
+  // Handle audio stream for visualization
+  const handleStream = useCallback((stream: MediaStream) => {
+    // Create audio context
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioContextRef.current = audioContext;
+
+    // Create analyser node
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.8;
+    analyserRef.current = analyser;
+
+    // Connect stream to analyser
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyser);
+
+    isVisualizingRef.current = true;
+
+    // Start visualization loop
+    const draw = () => {
+      if (!canvasRef.current) return;
+
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Clear canvas
+      ctx.fillStyle = '#f5f5f5';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Only draw bars if we're actually visualizing
+      if (!isVisualizingRef.current || !analyserRef.current) return;
+
+      const bufferLength = analyserRef.current.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyserRef.current.getByteFrequencyData(dataArray);
+
+      // Draw waveform bars
+      const barWidth = (canvas.width / bufferLength) * 2.5;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = (dataArray[i] / 255) * canvas.height;
+
+        // Gradient from red to orange
+        const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
+        gradient.addColorStop(0, '#e74c3c');
+        gradient.addColorStop(1, '#f39c12');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+
+        x += barWidth;
+      }
+
+      animationFrameRef.current = requestAnimationFrame(draw);
+    };
+
+    draw();
+  }, []);
+
   const {
     isRecording,
     isPaused,
@@ -20,7 +91,39 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
     pauseRecording,
     resumeRecording,
     resetRecording,
-  } = useAudioRecorder();
+  } = useAudioRecorder(onRecordingStart, maxDuration, onDurationChange, handleStream);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  // Stop visualization when not recording
+  useEffect(() => {
+    if (!isRecording) {
+      isVisualizingRef.current = false;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      // Clear canvas when not recording
+      if (canvasRef.current) {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#f5f5f5';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    }
+  }, [isRecording]);
 
   // Notify parent when recording is complete - only when recording stops and we have audio
   const prevBlobRef = useRef<Blob | null>(null);
@@ -98,38 +201,39 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         {isRecording && <span style={{ fontSize: '16px' }}> ⏺</span>}
       </div>
 
-      {/* Waveform Visualizer Placeholder */}
+      {/* Waveform Visualizer */}
       <div
         style={{
           height: '60px',
           backgroundColor: '#f5f5f5',
           borderRadius: '8px',
           marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
-        {isRecording ? (
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {[...Array(12)].map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  width: '4px',
-                  height: `${Math.random() * 40 + 10}px`,
-                  backgroundColor: '#e74c3c',
-                  borderRadius: '2px',
-                  animation: `pulse 0.5s ease-in-out ${i * 0.1}s infinite alternate`,
-                }}
-              />
-            ))}
+        <canvas
+          ref={canvasRef}
+          width={360}
+          height={60}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
+        {!isRecording && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}>
+            <span style={{ color: '#999', fontSize: '14px' }}>
+              {audioUrl ? 'Recording complete!' : 'Press record to start'}
+            </span>
           </div>
-        ) : (
-          <span style={{ color: '#999', fontSize: '14px' }}>
-            {audioUrl ? 'Recording complete!' : 'Press record to start'}
-          </span>
         )}
       </div>
 
@@ -261,13 +365,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         </div>
       )}
 
-      {/* Styles for animation */}
-      <style>{`
-        @keyframes pulse {
-          0% { transform: scaleY(0.5); }
-          100% { transform: scaleY(1); }
-        }
-      `}</style>
     </div>
   );
 };

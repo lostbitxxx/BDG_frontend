@@ -75,6 +75,22 @@ export const authService = {
 
   isAuthenticated: (): boolean => !!localStorage.getItem('token'),
 
+  async updateUsername(username: string): Promise<{ success: boolean; username?: string; error?: string }> {
+    try {
+      const result = await put<{ success: boolean; username?: string; error?: string }>('/api/auth/username', { username });
+      if (result.success && result.username) {
+        const user = authService.getUser();
+        if (user) {
+          user.username = result.username;
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+      }
+      return result;
+    } catch {
+      return { success: false, error: 'Failed to update username.' };
+    }
+  },
+
   async updateCharacter(character: 'bunny' | 'cat' | 'owl'): Promise<AuthResponse> {
     try {
       const result = await put<AuthResponse>('/api/auth/character', { character });
@@ -92,6 +108,39 @@ export const authService = {
 export const chatService = {
   async sendMessage(message: string): Promise<ChatResponse> {
     return post<ChatResponse>('/api/chat', { message });
+  }
+};
+
+// ─── Tailored Practice ────────────────────────────────────
+export interface GeneratedQuestion {
+  content: string;
+  pinyin: string;
+  type: 'tone' | 'pronunciation' | 'vocabulary' | 'grammar' | 'reading';
+  difficulty: 'easy' | 'medium' | 'hard';
+  hint?: string;
+}
+
+export interface TailoredPracticeResponse {
+  success: boolean;
+  questions?: GeneratedQuestion[];
+  error?: string;
+  generatedFor?: string;
+}
+
+export const tailoredPracticeService = {
+  async generatePractice(params: {
+    userInput?: string;
+    categories?: string[];
+    weaknesses?: string[];
+    historyRecord?: {
+      feedbackEn: string;
+      feedbackZh: string;
+      weaknesses: string[];
+      strengths: string[];
+      overallScore: number;
+    };
+  }): Promise<TailoredPracticeResponse> {
+    return post<TailoredPracticeResponse>('/api/tailored-practice', params);
   }
 };
 
