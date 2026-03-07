@@ -51,6 +51,75 @@ async function get<T>(path: string): Promise<T> {
   return res.json();
 }
 
+// ─── Test history (backend: GET /api/test/history) ────────────────────────────────────────
+export interface BackendTestHistoryItem {
+  id: string;
+  sessionId: string;
+  type: 'full' | 'partial';
+  partialSection?: number | null;
+  completedAt: string;
+  totalScore: number;
+  testGPA: number;
+  level: string;
+  grade: string;
+  pass: boolean;
+  sectionGrades?: Record<string, string>;
+  sectionGPAs?: Record<string, number>;
+  completedSections?: number[];
+}
+
+export async function getTestHistory(limit = 50): Promise<{ success: boolean; history?: BackendTestHistoryItem[]; error?: string }> {
+  try {
+    const path = `/api/test/history?limit=${Math.min(Math.max(1, limit), 100)}`;
+    const out = await get<{ success: boolean; history?: BackendTestHistoryItem[]; error?: string }>(path);
+    return out ?? { success: false, history: [] };
+  } catch (e) {
+    console.error('getTestHistory failed:', e);
+    return { success: false, history: [], error: 'Could not load history.' };
+  }
+}
+
+/** Start a test session. Returns sessionId for use with complete. */
+export async function startTest(body: { type: 'full' | 'partial'; section?: number }): Promise<{ success: boolean; sessionId?: string; error?: string }> {
+  try {
+    const out = await post<{ success: boolean; sessionId?: string; error?: string }>('/api/test/start', body, true);
+    return out ?? { success: false };
+  } catch (e) {
+    console.error('startTest failed:', e);
+    return { success: false, error: 'Could not start test.' };
+  }
+}
+
+/** Complete payload for POST /api/test/:sessionId/complete. Optional auth; if sent, backend records to user history. */
+export interface CompleteTestPayload {
+  type: 'full' | 'partial';
+  partialSection?: number;
+  totalScore?: number;
+  testGPA?: number;
+  level?: string;
+  grade?: string;
+  pass?: boolean;
+  sectionGrades?: Record<string, string>;
+  sectionGPAs?: Record<string, number>;
+  completedSections?: number[];
+}
+
+export async function completeTest(sessionId: string, payload: CompleteTestPayload): Promise<{ success: boolean; error?: string }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/api/test/${encodeURIComponent(sessionId)}/complete`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const out = await res.json().catch(() => ({ success: false }));
+    return out ?? { success: false };
+  } catch (e) {
+    console.error('completeTest failed:', e);
+    return { success: false, error: 'Could not complete test.' };
+  }
+}
+
 // ─── Auth ────────────────────────────────────────────────────
 export const authService = {
   async register(data: {

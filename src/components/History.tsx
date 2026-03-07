@@ -1,39 +1,48 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import Header from "./Header";
-import { COLORS } from "../constants";
-import { getTestRecords, getPracticeRecords, TestRecord, PracticeRecord, getAggregatedWeakAreas } from "../services/testHistory";
-import { useNavigate } from "react-router-dom";
-import { ROUTES } from "../constants";
+import { COLORS, ROUTES } from "../constants";
+import { getTestHistory, type BackendTestHistoryItem } from "../services/api";
+import { getPracticeRecords, PracticeRecord } from "../services/testHistory";
+import { useAuth } from "../context/AuthContext";
 
 const History: React.FC = () => {
-  const navigate = useNavigate();
-  const [testRecords, setTestRecords] = useState<TestRecord[]>([]);
+  const { isAuthenticated } = useAuth();
+  const [testHistory, setTestHistory] = useState<BackendTestHistoryItem[]>([]);
   const [practiceRecords, setPracticeRecords] = useState<PracticeRecord[]>([]);
   const [activeTab, setActiveTab] = useState<'tests' | 'practice'>('tests');
   const [isLoading, setIsLoading] = useState(true);
-  const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [isAuthenticated]);
 
   const loadData = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
-      const [tests, practices] = await Promise.all([
-        getTestRecords(),
+      const [historyRes, practices] = await Promise.all([
+        getTestHistory(50),
         getPracticeRecords()
       ]);
-      setTestRecords(tests);
+      setTestHistory(historyRes.success && Array.isArray(historyRes.history) ? historyRes.history : []);
       setPracticeRecords(practices);
+      if (historyRes.error) setLoadError(historyRes.error);
     } catch (error) {
       console.error('Error loading history:', error);
+      setLoadError('Could not load history. You may need to sign in.');
+      setTestHistory([]);
+      setPracticeRecords([]);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+  const formatDate = (iso: string | Date) => {
+    const d = typeof iso === 'string' ? new Date(iso) : iso;
+    return d.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -50,32 +59,17 @@ const History: React.FC = () => {
   };
 
   const getLevelBadgeColor = (level: string) => {
-    if (level.includes('1')) return '#27ae60';
-    if (level.includes('2')) return '#3498db';
-    if (level.includes('3')) return '#f39c12';
+    if (level.includes('1') || level.includes('一')) return '#27ae60';
+    if (level.includes('2') || level.includes('二')) return '#3498db';
+    if (level.includes('3') || level.includes('三')) return '#f39c12';
     return '#e74c3c';
   };
 
-  const handlePracticeFromWeakness = (record: TestRecord) => {
-    // Navigate to tailored practice with the weaknesses from this record
-    navigate(ROUTES.TAILORED_PRACTICE, {
-      state: {
-        fromHistory: true,
-        testRecord: record,
-        weaknesses: record.weaknesses,
-        strengths: record.strengths,
-        testRecordId: record.id
-      }
-    });
-  };
-
-  // Calculate summary stats
-  const totalTests = testRecords.length;
+  const totalTests = testHistory.length;
   const avgScore = totalTests > 0
-    ? Math.round(testRecords.reduce((sum, r) => sum + r.overallScore, 0) / totalTests)
+    ? Math.round(testHistory.reduce((sum, r) => sum + (r.totalScore ?? 0), 0) / totalTests)
     : 0;
-  const bestScore = totalTests > 0 ? Math.max(...testRecords.map(r => r.overallScore)) : 0;
-  const weakAreas = getAggregatedWeakAreas(testRecords);
+  const bestScore = totalTests > 0 ? Math.max(...testHistory.map(r => r.totalScore ?? 0)) : 0;
 
   if (isLoading) {
     return (
@@ -88,12 +82,35 @@ const History: React.FC = () => {
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
+        <Header />
+        <main style={{ padding: "24px 20px", maxWidth: "900px", margin: "0 auto", textAlign: "center" }}>
+          <h1 style={{ color: COLORS.primary, marginBottom: "8px", fontSize: "28px" }}>📊 History</h1>
+          <p style={{ color: COLORS.muted, marginBottom: "24px" }}>Sign in to save and view your test results and marks.</p>
+          <Link to={ROUTES.SIGNIN}>
+            <button style={{ padding: "12px 24px", fontSize: "16px", backgroundColor: COLORS.primary, color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>
+              Sign in
+            </button>
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
       <Header />
       <main style={{ padding: "24px 20px", maxWidth: "900px", margin: "0 auto" }}>
         <h1 style={{ textAlign: "center", color: COLORS.primary, marginBottom: "8px", fontSize: "28px" }}>📊 History</h1>
         <p style={{ textAlign: "center", color: COLORS.muted, marginBottom: "32px" }}>View your test results and practice progress</p>
+
+        {loadError && (
+          <div style={{ padding: "12px 16px", marginBottom: "24px", backgroundColor: "#ffebee", borderRadius: "8px", color: "#c62828" }}>
+            {loadError}
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "32px" }}>
@@ -110,20 +127,6 @@ const History: React.FC = () => {
             <div style={{ fontSize: "14px", color: COLORS.muted }}>Best Score</div>
           </div>
         </div>
-
-        {/* Weak Areas Alert */}
-        {weakAreas.length > 0 && (
-          <div style={{ backgroundColor: "#fff3e0", borderRadius: "12px", padding: "16px", marginBottom: "24px", borderLeft: "4px solid #ff9800" }}>
-            <div style={{ fontWeight: "600", color: "#e65100", marginBottom: "8px" }}>Areas to Focus On:</div>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {weakAreas.map((area, idx) => (
-                <span key={idx} style={{ backgroundColor: "#ff9800", color: "white", padding: "4px 12px", borderRadius: "16px", fontSize: "13px" }}>
-                  {area}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
@@ -159,36 +162,45 @@ const History: React.FC = () => {
           </button>
         </div>
 
-        {/* Test Records List */}
+        {/* Test history from backend (GET /api/test/history) */}
         {activeTab === 'tests' && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {testRecords.length === 0 ? (
+            {testHistory.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px", backgroundColor: "white", borderRadius: "12px" }}>
                 <span style={{ fontSize: "48px" }}>📝</span>
-                <p style={{ color: COLORS.muted, marginTop: "16px" }}>No test records yet. Take a mock test to see your history!</p>
+                <p style={{ color: COLORS.muted, marginTop: "16px" }}>No test records yet. Complete a mock test (and finish with Submit test) to see your history here.</p>
               </div>
             ) : (
-              testRecords.map((record) => (
-                <div key={record.id} style={{ backgroundColor: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+              testHistory.map((item) => (
+                <div key={item.id} style={{ backgroundColor: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
                     <div>
-                      <div style={{ fontSize: "14px", color: COLORS.muted }}>{formatDate(record.testDate)}</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px" }}>
-                        <span style={{ fontSize: "24px", fontWeight: "bold", color: getScoreColor(record.overallScore) }}>{record.overallScore}%</span>
+                      <div style={{ fontSize: "14px", color: COLORS.muted }}>{formatDate(item.completedAt)}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "24px", fontWeight: "bold", color: getScoreColor(item.totalScore ?? 0) }}>{Math.round(item.totalScore ?? 0)}%</span>
+                        {item.testGPA != null && (
+                        <span style={{ fontSize: "16px", fontWeight: "600", color: COLORS.secondary }}>GPA {Number(item.testGPA).toFixed(1)}</span>
+                        )}
                         <span style={{
-                          backgroundColor: getLevelBadgeColor(record.level),
+                          backgroundColor: getLevelBadgeColor(item.level),
                           color: "white",
                           padding: "4px 12px",
                           borderRadius: "16px",
                           fontSize: "12px",
                           fontWeight: "600"
                         }}>
-                          {record.level} - {record.grade}
+                          {item.level} – {item.grade}
                         </span>
+                        {item.pass != null && (
+                          <span style={{ fontSize: "12px", color: item.pass ? "#2e7d32" : "#c62828" }}>{item.pass ? "Pass" : "No pass"}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "12px", color: COLORS.muted, marginTop: "4px" }}>
+                        {item.type === 'full' ? 'Full test' : `Section ${item.partialSection ?? '?'}`}
                       </div>
                     </div>
                     <button
-                      onClick={() => setExpandedRecord(expandedRecord === record.id ? null : record.id!)}
+                      onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                       style={{
                         padding: "8px 16px",
                         fontSize: "13px",
@@ -199,76 +211,24 @@ const History: React.FC = () => {
                         cursor: "pointer",
                       }}
                     >
-                      {expandedRecord === record.id ? "Hide Details" : "View Details"}
+                      {expandedId === item.id ? "Hide Details" : "View Details"}
                     </button>
                   </div>
 
-                  {/* Section Scores */}
-                  <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-                    {record.sectionScores.map((sec, idx) => (
-                      <div key={idx} style={{
-                        padding: "6px 12px",
-                        backgroundColor: "#f8f9fa",
-                        borderRadius: "6px",
-                        fontSize: "12px",
-                      }}>
-                        <span style={{ color: COLORS.muted }}>S{sec.sectionId}: </span>
-                        <span style={{ fontWeight: "600", color: getScoreColor(sec.score) }}>{sec.score}%</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Strengths & Weaknesses */}
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    {record.strengths.length > 0 && record.strengths.map((s, idx) => (
-                      <span key={idx} style={{ backgroundColor: "#e8f5e9", color: "#2e7d32", padding: "4px 10px", borderRadius: "4px", fontSize: "12px" }}>
-                        ✓ {s}
-                      </span>
-                    ))}
-                    {record.weaknesses.length > 0 && record.weaknesses.map((w, idx) => (
-                      <span key={idx} style={{ backgroundColor: "#ffebee", color: "#c62828", padding: "4px 10px", borderRadius: "4px", fontSize: "12px" }}>
-                        ✗ {w}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Expanded Details */}
-                  {expandedRecord === record.id && (
+                  {expandedId === item.id && (item.sectionGrades || item.sectionGPAs) && (
                     <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #eee" }}>
-                      {/* AI Feedback */}
-                      {record.feedbackEn && (
-                        <div style={{ marginBottom: "16px" }}>
-                          <div style={{ fontWeight: "600", color: COLORS.primary, marginBottom: "8px" }}>AI Feedback:</div>
-                          <div style={{ backgroundColor: "#e3f2fd", padding: "12px", borderRadius: "8px", fontSize: "13px", color: "#1565c0", marginBottom: "8px" }}>
-                            {record.feedbackEn}
+                      <div style={{ fontWeight: "600", color: COLORS.primary, marginBottom: "8px" }}>Section grades</div>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        {(item.completedSections ?? Object.keys(item.sectionGPAs ?? item.sectionGrades ?? {}).map(Number).sort((a, b) => a - b)).map((secId) => (
+                          <div key={secId} style={{ padding: "6px 12px", backgroundColor: "#f8f9fa", borderRadius: "6px", fontSize: "12px" }}>
+                            <span style={{ color: COLORS.muted }}>S{secId}: </span>
+                            <span style={{ fontWeight: "600" }}>{item.sectionGrades?.[String(secId)] ?? "—"}</span>
+                            {item.sectionGPAs?.[String(secId)] != null && (
+                              <span style={{ color: COLORS.secondary }}> ({Number(item.sectionGPAs[String(secId)]).toFixed(1)})</span>
+                            )}
                           </div>
-                          {record.feedbackZh && (
-                            <div style={{ backgroundColor: "#fff3e0", padding: "12px", borderRadius: "8px", fontSize: "13px", color: "#e65100" }}>
-                              {record.feedbackZh}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Practice Button */}
-                      {record.weaknesses.length > 0 && (
-                        <button
-                          onClick={() => handlePracticeFromWeakness(record)}
-                          style={{
-                            width: "100%",
-                            padding: "12px",
-                            fontSize: "14px",
-                            fontWeight: "600",
-                            backgroundColor: COLORS.secondary,
-                            color: "white",
-                            border: "none",
-                            borderRadius: "8px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          🎯 Practice Weak Areas from This Test
-                        </button>
-                      )}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
