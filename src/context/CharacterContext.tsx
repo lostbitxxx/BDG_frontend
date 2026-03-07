@@ -2,7 +2,15 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { useAuth } from './AuthContext';
 import { authService } from '../services/api';
 
-export type CharacterKey = 'bunny' | 'cat' | 'owl';
+export type CharacterKey = 'bunny' | 'foggy-birdie' | 'final-birdie';
+
+/** Optional Rive state machine config: run these state machines and set an input so the character starts in idle (not e.g. sleeping). */
+export interface RiveConfig {
+  /** Names of state machine layer(s) to run (e.g. 2 layers = 2 names). */
+  stateMachines: string[];
+  /** Optional: set this input on the first state machine to start in idle. */
+  idleInput?: { name: string; value: number | boolean };
+}
 
 export interface Character {
   key: CharacterKey;
@@ -10,29 +18,48 @@ export interface Character {
   file: string;
   emoji: string;
   description: string;
+  /** Optional: state machine and initial input for this character's .riv file. */
+  riveConfig?: RiveConfig;
+  /** Use transparent background for the Rive container (e.g. .riv with transparent art). */
+  transparentBackground?: boolean;
 }
 
 export const CHARACTERS: Character[] = [
   {
     key: 'bunny',
-    name: 'Bunny',
-    file: '/bunny.riv',
-    emoji: '🐰',
+    name: 'Red Birdie',
+    file: '/Red Birdie.riv',
+    emoji: '🐦',
     description: 'Cheerful and energetic — always ready to help!',
+    riveConfig: {
+      stateMachines: ['State Machine 1', 'State Machine 2'],
+      idleInput: { name: 'State', value: 0 },
+    },
+    transparentBackground: true,
   },
   {
-    key: 'cat',
-    name: 'Cat',
-    file: '/cat.riv',
-    emoji: '🐱',
+    key: 'foggy-birdie',
+    name: 'Foggy Birdie',
+    file: '/Foggy Birdie.riv',
+    emoji: '🐦',
     description: 'Cool and clever — gives sharp, witty answers.',
+    riveConfig: {
+      stateMachines: ['State Machine 1', 'State Machine 2'],
+      idleInput: { name: 'State', value: 0 },
+    },
+    transparentBackground: true,
   },
   {
-    key: 'owl',
-    name: 'Owl',
-    file: '/owl.riv',
-    emoji: '🦉',
+    key: 'final-birdie',
+    name: 'Final Birdie',
+    file: '/Final Birdie.riv',
+    emoji: '🐦',
     description: 'Wise and calm — thoughtful guidance every time.',
+    riveConfig: {
+      stateMachines: ['State Machine 1', 'State Machine 2'],
+      idleInput: { name: 'State', value: 0 },
+    },
+    transparentBackground: true,
   },
 ];
 
@@ -181,7 +208,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
         const totalXp = Math.max(0, Number(affinityXp ?? 0));
         const level = Math.max(1, Math.min(5, Number(affinityLevel ?? 1)));
         const data: AffinityFromBackend = { affinityXp: totalXp, affinityLevel: level };
-        setBackendAffinityByCharacter({ bunny: data, cat: data, owl: data });
+        setBackendAffinityByCharacter({ bunny: data, 'foggy-birdie': data, 'final-birdie': data });
       } else {
         setBackendAffinityByCharacter(loadAffinityFromStorage(storageKey));
       }
@@ -245,7 +272,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
   };
 
   const setAffinityFromAuth = (data: AffinityFromBackend) => {
-    setBackendAffinityByCharacter({ bunny: data, cat: data, owl: data });
+    setBackendAffinityByCharacter({ bunny: data, 'foggy-birdie': data, 'final-birdie': data });
   };
 
   useEffect(() => {

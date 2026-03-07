@@ -97,15 +97,31 @@ const Header: React.FC = () => {
     transition: "opacity 0.2s",
   };
 
-  const secondaryBtnStyle: React.CSSProperties = {
-    border: "2px solid #a7f3d0",
-    color: EMERALD.six,
-    padding: "8px 24px",
+  const signInBtnStyle: React.CSSProperties = {
+    border: "2px solid #d1d5db",
+    color: "#9ca3af",
+    padding: "12px 28px",
+    fontSize: "16px",
     borderRadius: "9999px",
-    fontWeight: 500,
+    fontWeight: 600,
     cursor: "pointer",
     background: "transparent",
-    transition: "border-color 0.3s, background 0.3s",
+    transition: "border-color 0.2s, color 0.2s",
+  };
+
+  const settingsBtnStyle: React.CSSProperties = {
+    width: 44,
+    height: 44,
+    padding: 0,
+    border: "none",
+    borderRadius: "50%",
+    backgroundColor: "#d1d5db",
+    color: "#4b5563",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "opacity 0.2s",
   };
 
   return (
@@ -130,47 +146,46 @@ const Header: React.FC = () => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "20px",
+              gap: "12px",
               position: "relative",
               zIndex: 50,
             }}
           >
-            <Link to={logoTo}>
-              <button
-                type="button"
-                style={{
-                  width: 40,
-                  height: 40,
-                  backgroundColor: "#a8d4f0",
-                  borderRadius: "50%",
-                  border: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                }}
-                aria-label="Go to home"
+            {isAuthenticated && user && (
+              <Link
+                to={ROUTES.SETTINGS}
+                aria-label="Settings"
+                className="header-settings-link"
+                data-active={isActive(ROUTES.SETTINGS)}
               >
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#1e5a8a"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <button
+                  type="button"
+                  className="header-settings-btn"
+                  style={settingsBtnStyle}
                 >
-                  <path d="M12 3l-3 6 2 2 1-2 1 5 1-5 1 2 2-2-3-6z" />
-                </svg>
-              </button>
-            </Link>
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </button>
+              </Link>
+            )}
             <Link
               to={logoTo}
               style={{
                 fontSize: "1.5rem",
                 fontWeight: 700,
                 color: "#1f2937",
+                textDecoration: "none",
               }}
             >
               BoDongGua
@@ -199,44 +214,17 @@ const Header: React.FC = () => {
             ))}
             {isAuthenticated && user ? (
               <>
-                <Link
-                  to={ROUTES.SETTINGS}
-                  aria-label="Settings"
-                  className="header-settings-link"
-                  data-active={isActive(ROUTES.SETTINGS)}
+                <button
+                  type="button"
+                  className="header-logout-btn"
+                  onClick={() => {
+                    logout();
+                    navigate(ROUTES.HOME);
+                  }}
+                  style={signInBtnStyle}
                 >
-                  <button
-                    type="button"
-                    className="header-settings-btn"
-                    style={{
-                      width: 44,
-                      height: 44,
-                      padding: 0,
-                      border: "none",
-                      borderRadius: "50%",
-                      backgroundColor: "transparent",
-                      color: "#4b5563",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="3" />
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                    </svg>
-                  </button>
-                </Link>
+                  Sign Out
+                </button>
                 <Link to={ROUTES.MOCK_TEST}>
                   <button
                     type="button"
@@ -246,31 +234,11 @@ const Header: React.FC = () => {
                     Start a Test
                   </button>
                 </Link>
-                <button
-                  type="button"
-                  className="header-logout-btn"
-                  onClick={() => {
-                    logout();
-                    navigate(ROUTES.HOME);
-                  }}
-                  style={{
-                    padding: "8px 24px",
-                    borderRadius: "9999px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    background: "transparent",
-                    border: `2px solid ${COLORS.border}`,
-                    color: "#4b5563",
-                    transition: "border-color 0.3s, background 0.3s",
-                  }}
-                >
-                  Sign Out
-                </button>
               </>
             ) : (
               <>
                 <Link to={ROUTES.SIGNIN}>
-                  <button style={secondaryBtnStyle}>Sign In</button>
+                  <button style={signInBtnStyle}>Sign In</button>
                 </Link>
                 <Link to={ROUTES.SIGNUP}>
                   <button
@@ -296,46 +264,6 @@ const Header: React.FC = () => {
             }}
             className="header-mobile"
           >
-            {isAuthenticated && user ? (
-              <Link
-                to={ROUTES.SETTINGS}
-                aria-label="Settings"
-                className="header-settings-link header-mobile-settings"
-                data-active={isActive(ROUTES.SETTINGS)}
-              >
-                <button
-                  type="button"
-                  className="header-settings-btn"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    padding: 0,
-                    border: "none",
-                    borderRadius: "50%",
-                    backgroundColor: "transparent",
-                    color: "#4b5563",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                </button>
-              </Link>
-            ) : null}
             <button
               type="button"
               style={{
@@ -445,7 +373,7 @@ const Header: React.FC = () => {
             {!isAuthenticated && (
               <>
                 <Link to={ROUTES.SIGNIN} onClick={() => handleMobileToggle()}>
-                  <button style={secondaryBtnStyle}>Sign In</button>
+                  <button style={signInBtnStyle}>Sign In</button>
                 </Link>
                 <Link to={ROUTES.SIGNUP} onClick={() => handleMobileToggle()}>
                   <button
@@ -459,28 +387,29 @@ const Header: React.FC = () => {
               </>
             )}
             {isAuthenticated && (
-              <button
-                type="button"
-                className="header-logout-btn"
-                onClick={() => {
-                  handleMobileToggle();
-                  logout();
-                  navigate(ROUTES.HOME);
-                }}
-                style={{
-                  padding: "12px 24px",
-                  borderRadius: "9999px",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  background: "transparent",
-                  border: `2px solid ${COLORS.border}`,
-                  color: "#4b5563",
-                  transition: "border-color 0.3s, background 0.3s",
-                  width: "100%",
-                }}
-              >
-                Sign Out
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="header-logout-btn"
+                  onClick={() => {
+                    handleMobileToggle();
+                    logout();
+                    navigate(ROUTES.HOME);
+                  }}
+                  style={{ ...signInBtnStyle, width: "100%" }}
+                >
+                  Sign Out
+                </button>
+                <Link to={ROUTES.MOCK_TEST} onClick={() => handleMobileToggle()}>
+                  <button
+                    type="button"
+                    className="header-start-test-btn"
+                    style={{ ...startTestBtnStyle, width: "100%" }}
+                  >
+                    Start a Test
+                  </button>
+                </Link>
+              </>
             )}
           </div>
         )}
@@ -503,12 +432,11 @@ const Header: React.FC = () => {
           color: ${COLORS.secondary} !important;
         }
         .header-settings-btn:hover {
-          background-color: rgba(52, 152, 219, 0.15) !important;
-          color: ${COLORS.secondary} !important;
+          opacity: 0.9;
         }
         .header-settings-link[data-active="true"] .header-settings-btn {
-          background-color: rgba(52, 152, 219, 0.2) !important;
-          color: ${COLORS.secondary} !important;
+          background-color: #d1d5db !important;
+          color: #4b5563 !important;
         }
         .header-start-test-btn:hover {
           opacity: 0.9;

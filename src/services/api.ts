@@ -113,7 +113,7 @@ export const authService = {
     }
   },
 
-  async updateCharacter(character: 'bunny' | 'cat' | 'owl'): Promise<AuthResponse> {
+  async updateCharacter(character: 'bunny' | 'foggy-birdie' | 'final-birdie'): Promise<AuthResponse> {
     try {
       const result = await put<AuthResponse>('/api/auth/character', { character });
       if (result.success && result.user) {

@@ -67,7 +67,7 @@ const SignIn: React.FC = () => {
       });
       if (result.success && result.user && result.token) {
         login(result.user, result.token);
-        setCharacter((result.user.character ?? "bunny") as "bunny" | "cat" | "owl");
+        setCharacter((result.user.character ?? "bunny") as "bunny" | "foggy-birdie" | "final-birdie");
         try {
           await signInWithCustomToken(auth, result.token);
         } catch (e) {

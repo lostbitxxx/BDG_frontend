@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useRive } from "@rive-app/react-canvas";
+import { useRive, useStateMachineInput } from "@rive-app/react-canvas";
 import Header from "./Header";
 import { COLORS, ROUTES } from "../constants";
 import {
@@ -16,10 +16,17 @@ const CharacterCard: React.FC<{
   isSelected: boolean;
   onSelect: () => void;
 }> = ({ character, isSelected, onSelect }) => {
-  const { RiveComponent } = useRive({
-    src: character.file,
-    autoplay: true,
-  });
+  const riveParams = character.riveConfig
+    ? { src: character.file, stateMachines: character.riveConfig.stateMachines, autoplay: true }
+    : { src: character.file, autoplay: true };
+  const { RiveComponent, rive } = useRive(riveParams);
+  const smName = character.riveConfig?.stateMachines?.[0];
+  const idleInputName = character.riveConfig?.idleInput?.name;
+  const idleInputValue = character.riveConfig?.idleInput?.value;
+  const idleInput = useStateMachineInput(rive, smName ?? undefined, idleInputName ?? undefined, idleInputValue);
+  useEffect(() => {
+    if (idleInput != null && idleInputValue !== undefined) idleInput.value = idleInputValue;
+  }, [idleInput, idleInputValue]);
 
   return (
     <div
@@ -49,7 +56,7 @@ const CharacterCard: React.FC<{
           height: "180px",
           borderRadius: "12px",
           overflow: "hidden",
-          backgroundColor: COLORS.light,
+          backgroundColor: character.transparentBackground ? "transparent" : COLORS.light,
         }}
       >
         <RiveComponent style={{ width: "100%", height: "100%" }} />

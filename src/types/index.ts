@@ -4,7 +4,7 @@ export interface User {
   _id: string;
   email: string;
   username: string;
-  character: 'bunny' | 'cat' | 'owl';
+  character: 'bunny' | 'foggy-birdie' | 'final-birdie';
   isEmailVerified: boolean;
   createdAt: string;
   lastLoginAt?: string;
