@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Header from "./Header";
 import AudioRecorder from "./AudioRecorder";
@@ -18,7 +18,7 @@ const SECTION_TIME_LIMITS: Record<number, number> = {
   5: 180,  // 3 minutes
 };
 
-// PSC Section Info
+// PSC Section Info (fallback when API not used)
 const SECTIONS = [
   { id: 1, title: "Section 1: Single Characters", description: "100 characters - test basic syllables", timeLimit: "3 min", scoreWeight: "10%", icon: "📝" },
   { id: 2, title: "Section 2: Polysyllabic Words", description: "100 words - focus on tones", timeLimit: "3 min", scoreWeight: "20%", icon: "📖" },
@@ -26,6 +26,31 @@ const SECTIONS = [
   { id: 4, title: "Section 4: Reading Passage", description: "Read 400-character passage", timeLimit: "4 min", scoreWeight: "30%", icon: "📄" },
   { id: 5, title: "Section 5: Speaking Topic", description: "3-minute speech on topic", timeLimit: "3 min", scoreWeight: "30%", icon: "🎤" },
 ];
+
+// GET /api/test/sections response (backend)
+export interface TestSectionInfo {
+  section: number;
+  name: string;
+  nameEn: string;
+  timeLimit: number;
+}
+
+const TOTAL_SECTIONS = 5;
+
+async function fetchTestSections(): Promise<TestSectionInfo[]> {
+  try {
+    const base = API_BASE_URL.replace(/\/api\/?$/, "") || "";
+    const url = base ? `${base}/api/test/sections` : "/api/test/sections";
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data?.success && Array.isArray(data.sections) && data.sections.length > 0) {
+      return data.sections;
+    }
+  } catch (_) {
+    // ignore
+  }
+  return [];
+}
 
 // PSC Testing Rules
 const TEST_RULES = [
@@ -71,6 +96,27 @@ export function getScoreDescription(grade: string, level: string): string {
     'Below Level 3': 'Needs more practice.',
   };
   return descriptions[`${level}${grade ? '-' + grade : ''}`] || 'Keep practicing!';
+}
+
+// GPA bands (match backend): 90+ A, 85-89 B+, 80-84 B, 70-79 C+, 60-69 C, <60 D
+type GPAGrade = 'A' | 'B+' | 'B' | 'C+' | 'C' | 'D';
+const SCORE_PERCENT_TO_GRADE: { min: number; grade: GPAGrade }[] = [
+  { min: 90, grade: 'A' },
+  { min: 85, grade: 'B+' },
+  { min: 80, grade: 'B' },
+  { min: 70, grade: 'C+' },
+  { min: 60, grade: 'C' },
+  { min: 0, grade: 'D' },
+];
+const GRADE_TO_GPA: Record<GPAGrade, number> = { A: 4, 'B+': 3, B: 2.5, 'C+': 2.3, C: 2, D: 1 };
+
+function scorePercentToGrade(percent: number): GPAGrade {
+  const row = SCORE_PERCENT_TO_GRADE.find((r) => percent >= r.min);
+  return row?.grade ?? 'D';
+}
+
+function gradeToGPA(grade: GPAGrade): number {
+  return GRADE_TO_GPA[grade] ?? 1;
 }
 
 // Full Test Component - Left side
@@ -479,25 +525,103 @@ const RulesModal: React.FC<{
   );
 };
 
+// Full test: section result for summary (grade + gpa per section)
+export type FullTestSectionResult = { grade: string; gpa: number };
+
+// Summary page after completing a full test (all 5 sections)
+const FullTestSummary: React.FC<{
+  sectionResults: Record<number, FullTestSectionResult>;
+  sectionList: TestSectionInfo[] | null;
+  onBack: () => void;
+}> = ({ sectionResults, sectionList, onBack }) => {
+  const sectionIds = [1, 2, 3, 4, 5] as const;
+  const completed = sectionIds.filter((id) => sectionResults[id]);
+  const testGPA =
+    completed.length > 0
+      ? completed.reduce((sum, id) => sum + sectionResults[id].gpa, 0) / completed.length
+      : 0;
+
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
+      <Header />
+      <main style={{ padding: "24px 20px", maxWidth: "600px", margin: "0 auto" }}>
+        <h2 style={{ textAlign: "center", color: COLORS.primary, marginBottom: "8px" }}>Test complete</h2>
+        <p style={{ textAlign: "center", color: COLORS.muted, marginBottom: "24px" }}>Full PSC mock test summary</p>
+
+        <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "24px", marginBottom: "24px", textAlign: "center" }}>
+          <div style={{ fontSize: "14px", color: COLORS.muted, marginBottom: "4px" }}>Test GPA</div>
+          <div style={{ fontSize: "48px", fontWeight: "bold", color: COLORS.primary }}>{testGPA.toFixed(1)}</div>
+        </div>
+
+        <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
+          <h3 style={{ margin: "0 0 16px 0", color: COLORS.primary, fontSize: "16px" }}>Section results</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {sectionIds.map((id) => {
+              const result = sectionResults[id];
+              const apiInfo = sectionList?.find((s) => s.section === id);
+              const fallbackInfo = SECTIONS.find((s) => s.id === id);
+              const label = apiInfo ? apiInfo.nameEn : fallbackInfo ? fallbackInfo.title : `Section ${id}`;
+              return (
+                <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
+                  <span style={{ fontWeight: "500", color: COLORS.primary }}>{label}</span>
+                  {result ? (
+                    <span style={{ fontWeight: "600", color: COLORS.secondary }}>{result.grade} ({result.gpa.toFixed(1)})</span>
+                  ) : (
+                    <span style={{ color: COLORS.muted, fontSize: "14px" }}>Not completed</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <button type="button" onClick={onBack} style={{ padding: "12px 24px", fontSize: "14px", backgroundColor: COLORS.primary, color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>
+            Back to test
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+};
+
 // Question Page Component - The detailed recording interface
 const QuestionPage: React.FC<{
   section: number;
   questions: Question[];
   onBack: () => void;
-}> = ({ section, questions, onBack }) => {
+  isFullTest?: boolean;
+  onNextSection?: (currentSection: number) => void;
+  onSectionComplete?: (section: number, data: FullTestSectionResult) => void;
+  sectionList?: TestSectionInfo[] | null;
+  totalSections?: number;
+}> = ({ section, questions, onBack, isFullTest, onNextSection, onSectionComplete, sectionList, totalSections = 5 }) => {
   const { character, setAffinityFromBackend } = useCharacter();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [timeLimit] = useState(SECTION_TIME_LIMITS[section]);
+  const apiSection = sectionList?.find((s) => s.section === section);
+  const timeLimit = apiSection?.timeLimit ?? SECTION_TIME_LIMITS[section];
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isSectionMode = section === 1 || section === 2;
   const currentQ = questions[currentQuestionIndex];
+
+  // Report section grade/GPA to parent for full-test summary when analysis succeeds
+  useEffect(() => {
+    if (!onSectionComplete || !analysisResult?.success) return;
+    const grades = analysisResult.sectionGrades as Record<number, string> | undefined;
+    const gpas = analysisResult.sectionGPAs as Record<number, number> | undefined;
+    const grade = grades?.[section];
+    const gpa = gpas?.[section];
+    if (grade != null && gpa != null) {
+      onSectionComplete(section, { grade, gpa: Number(gpa) });
+    }
+  }, [analysisResult, section, onSectionComplete]);
 
   useEffect(() => {
     if (isTimerRunning && !recordedAudio) {
@@ -571,10 +695,36 @@ const QuestionPage: React.FC<{
       } catch {
         result = {
           success: false,
+          code: 'audio_cannot_be_processed',
           error: analyzeResponse.status === 404
             ? 'Analyze endpoint not found. Check that the backend is running and the URL is correct.'
             : `Request failed (${analyzeResponse.status})`,
         };
+      }
+      // Non-2xx: treat as analysis failure and ensure stable shape for error UI (code + error)
+      if (!analyzeResponse.ok) {
+        result = {
+          ...result,
+          success: false,
+          code: (result.code as string) || 'audio_cannot_be_processed',
+          error: (result.error as string) || `Request failed (${analyzeResponse.status})`,
+        };
+      }
+      // Ensure GPA is always available after each test: use backend values or derive from section score
+      const hasGPAFromBackend = result.testGPA != null || (result.sectionGPAs && typeof result.sectionGPAs === 'object' && Object.keys(result.sectionGPAs as object).length > 0);
+      if (!hasGPAFromBackend && result.success && section != null) {
+        const scores = result.scores as { overall?: number } | undefined;
+        const overall = scores?.overall;
+        if (typeof overall === 'number') {
+          const grade = scorePercentToGrade(overall);
+          const gpa = gradeToGPA(grade);
+          result = {
+            ...result,
+            sectionGrades: { ...(result.sectionGrades as object || {}), [section]: grade },
+            sectionGPAs: { ...(result.sectionGPAs as object || {}), [section]: gpa },
+            testGPA: gpa,
+          };
+        }
       }
       setAnalysisResult(result);
 
@@ -641,9 +791,9 @@ const QuestionPage: React.FC<{
     finally { setIsUploading(false); setIsAnalyzing(false); }
   };
 
-  const handleReRecord = () => {
-    setRecordedAudio(null);
+  const handleRerecord = () => {
     setAnalysisResult(null);
+    setRecordedAudio(null);
     setElapsedTime(0);
   };
 
@@ -655,18 +805,28 @@ const QuestionPage: React.FC<{
   };
 
   const sectionInfo = SECTIONS.find(s => s.id === section);
+  const sectionTitle = isFullTest && apiSection
+    ? `Section ${section} of ${totalSections}: ${apiSection.nameEn}`
+    : sectionInfo?.title;
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
       <Header />
       <main style={{ padding: "24px 20px", maxWidth: "1000px", margin: "0 auto" }}>
-        <button onClick={onBack} style={{ padding: "8px 16px", fontSize: "14px", backgroundColor: "white", border: "1px solid #e0e0e0", borderRadius: "8px", cursor: "pointer", marginBottom: "20px" }}>
-          ← Back
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+          <button onClick={onBack} style={{ padding: "8px 16px", fontSize: "14px", backgroundColor: "white", border: "1px solid #e0e0e0", borderRadius: "8px", cursor: "pointer" }}>
+            ← Back
+          </button>
+          {isFullTest && onNextSection && (
+            <button type="button" onClick={() => onNextSection(section)} style={{ padding: "8px 16px", fontSize: "14px", backgroundColor: COLORS.primary, color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>
+              {section < totalSections ? "Next section" : "Submit test"}
+            </button>
+          )}
+        </div>
 
         <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontWeight: "bold", color: COLORS.primary }}>{sectionInfo?.title}</div>
+            <div style={{ fontWeight: "bold", color: COLORS.primary }}>{sectionTitle}</div>
             <div style={{ color: COLORS.muted, fontSize: "14px" }}>{questions.length} questions</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -750,7 +910,7 @@ const QuestionPage: React.FC<{
 
         {recordedAudio && !analysisResult && (
           <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "20px" }}>
-            <button onClick={handleReRecord} disabled={isUploading || isAnalyzing} style={{ padding: "12px 24px", fontSize: "14px", backgroundColor: "#95a5a6", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>Re-record</button>
+            <button type="button" onClick={handleRerecord} disabled={isUploading || isAnalyzing} style={{ padding: "12px 24px", fontSize: "14px", backgroundColor: "#95a5a6", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>Re-record</button>
             <button onClick={handleUpload} disabled={isUploading || isAnalyzing} style={{ padding: "12px 32px", fontSize: "14px", backgroundColor: isUploading || isAnalyzing ? "#95a5a6" : COLORS.primary, color: "white", border: "none", borderRadius: "8px", cursor: isUploading || isAnalyzing ? "not-allowed" : "pointer" }}>
               {isUploading ? "Uploading..." : isAnalyzing ? "Analyzing..." : "Submit & Analyze"}
             </button>
@@ -760,7 +920,7 @@ const QuestionPage: React.FC<{
         {analysisResult && (
           <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "32px", marginTop: "24px" }}>
             <h3 style={{ margin: "0 0 24px 0", color: COLORS.primary, textAlign: "center" }}>Analysis Results</h3>
-            {analysisResult.success ? (
+            {(analysisResult.success && analysisResult.code !== 'audio_cannot_be_processed') ? (
               <>
                 <div style={{ textAlign: "center", padding: "24px", backgroundColor: "#f8f9fa", borderRadius: "12px", marginBottom: "24px" }}>
                   <div style={{ fontSize: "14px", color: COLORS.muted }}>PSC Score</div>
@@ -776,10 +936,51 @@ const QuestionPage: React.FC<{
                     {analysisResult.scores.fluency !== undefined && <div style={{ textAlign: "center", padding: "16px", backgroundColor: "#f8f9fa", borderRadius: "8px" }}><div style={{ fontSize: "12px", color: COLORS.muted }}>Fluency</div><div style={{ fontSize: "28px", fontWeight: "bold", color: getScoreColor(analysisResult.scores.fluency) }}>{Math.round(analysisResult.scores.fluency)}</div></div>}
                   </div>
                 )}
+                {(analysisResult.testGPA != null || (analysisResult.sectionGPAs && Object.keys(analysisResult.sectionGPAs).length > 0)) && (
+                  <div style={{ marginBottom: "24px" }}>
+                    <h4 style={{ margin: "0 0 12px 0", color: COLORS.primary }}>GPA</h4>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
+                      {analysisResult.testGPA != null && (
+                        <div style={{ padding: "12px 20px", backgroundColor: "#e8f5e9", borderRadius: "12px", border: "2px solid #2e7d32" }}>
+                          <div style={{ fontSize: "12px", color: COLORS.muted }}>Test GPA</div>
+                          <div style={{ fontSize: "28px", fontWeight: "bold", color: "#2e7d32" }}>{Number(analysisResult.testGPA).toFixed(1)}</div>
+                        </div>
+                      )}
+                      {analysisResult.sectionGrades && analysisResult.sectionGPAs && (() => {
+                        const sectionIds = Object.keys(analysisResult.sectionGPAs as Record<string, number>)
+                          .map((k) => (Number.isNaN(Number(k)) ? k : Number(k)))
+                          .sort((a, b) => Number(a) - Number(b));
+                        return sectionIds.map((sectionId) => {
+                          const grades = analysisResult.sectionGrades as Record<string | number, string>;
+                          const gpas = analysisResult.sectionGPAs as Record<string | number, number>;
+                          const grade = grades?.[sectionId];
+                          const gpa = gpas?.[sectionId];
+                          if (grade == null && gpa == null) return null;
+                          const id = typeof sectionId === "number" ? sectionId : Number(sectionId);
+                          const sectionTitle = SECTIONS.find((s) => s.id === id);
+                          return (
+                            <div key={String(sectionId)} style={{ padding: "10px 16px", backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
+                              <div style={{ fontSize: "11px", color: COLORS.muted }}>{sectionTitle?.title ?? `Section ${sectionId}`}</div>
+                              <div style={{ fontSize: "16px", fontWeight: "600", color: COLORS.primary }}>
+                                {grade != null ? `${grade} ` : ""}{(gpa != null ? `(${Number(gpa).toFixed(1)})` : "")}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                )}
                 {analysisResult.feedback && <div><h4 style={{ margin: "0 0 12px 0", color: COLORS.primary }}>Feedback / 反馈</h4><div style={{ padding: "16px", backgroundColor: "#e3f2fd", borderRadius: "8px", whiteSpace: "pre-wrap", fontSize: "14px", color: "#1565c0" }}>{analysisResult.feedback}</div></div>}
               </>
             ) : (
-              <div style={{ padding: "16px", backgroundColor: "#ffebee", borderRadius: "8px" }}><p style={{ color: "#c62828", margin: 0 }}>Analysis Failed: {analysisResult.error || "Unknown error"}</p></div>
+              <div style={{ padding: "16px", backgroundColor: "#ffebee", borderRadius: "8px" }}>
+                <p style={{ color: "#c62828", margin: "0 0 16px 0" }}>Analysis Failed: {analysisResult.error || "Unknown error"}</p>
+                <p style={{ color: COLORS.muted, fontSize: "14px", margin: "0 0 16px 0" }}>The audio could not be processed. Try recording again.</p>
+                <button type="button" onClick={handleRerecord} style={{ padding: "12px 24px", fontSize: "14px", backgroundColor: COLORS.primary, color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>
+                  Rerecord
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -790,11 +991,13 @@ const QuestionPage: React.FC<{
 
 // Main MockTest Component
 const MockTest: React.FC = () => {
-  const [view, setView] = useState<'select' | 'rules' | 'question'>('select');
+  const [view, setView] = useState<'select' | 'rules' | 'question' | 'summary'>('select');
   const [selectedSection, setSelectedSection] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [testMode, setTestMode] = useState<'full' | 'section' | null>(null);
+  const [testSections, setTestSections] = useState<TestSectionInfo[] | null>(null);
+  const [fullTestSectionResults, setFullTestSectionResults] = useState<Record<number, FullTestSectionResult>>({});
 
   const handleSelectSection = async (section: 1 | 2 | 3 | 4 | 5) => {
     setSelectedSection(section);
@@ -802,11 +1005,14 @@ const MockTest: React.FC = () => {
     setView('rules');
   };
 
-  const handleStartFullTest = () => {
+  const handleStartFullTest = useCallback(async () => {
     setSelectedSection(1);
     setTestMode('full');
+    setFullTestSectionResults({});
     setView('rules');
-  };
+    const sections = await fetchTestSections();
+    setTestSections(sections.length > 0 ? sections : null);
+  }, []);
 
   const handleAcceptRules = async () => {
     setView('question');
@@ -834,6 +1040,37 @@ const MockTest: React.FC = () => {
     setTestMode(null);
   };
 
+  const handleSectionComplete = useCallback((section: number, data: FullTestSectionResult) => {
+    setFullTestSectionResults((prev) => ({ ...prev, [section]: data }));
+  }, []);
+
+  const handleNextSection = useCallback(async (currentSection: number) => {
+    if (currentSection >= 5) {
+      setView('summary');
+      return;
+    }
+    const next = (currentSection + 1) as 1 | 2 | 3 | 4 | 5;
+    setSelectedSection(next);
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/questions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section: next,
+          count: next <= 2 ? 100 : next === 3 ? 25 : next === 4 ? 1 : 2,
+        }),
+      });
+      const data = await response.json();
+      setQuestions(data.success && data.questions ? data.questions : getQuestionsBySection(next));
+    } catch {
+      setQuestions(getQuestionsBySection(next));
+    } finally {
+      setIsLoading(false);
+    }
+    setView('question');
+  }, []);
+
   if (view === 'question' && selectedSection) {
     if (isLoading) {
       return (
@@ -842,11 +1079,37 @@ const MockTest: React.FC = () => {
         </div>
       );
     }
-    return <QuestionPage section={selectedSection} questions={questions} onBack={() => setView('select')} />;
+    return (
+      <QuestionPage
+        section={selectedSection}
+        questions={questions}
+        onBack={() => setView('select')}
+        isFullTest={testMode === 'full'}
+        onNextSection={testMode === 'full' ? handleNextSection : undefined}
+        onSectionComplete={testMode === 'full' ? handleSectionComplete : undefined}
+        sectionList={testMode === 'full' ? testSections : null}
+        totalSections={TOTAL_SECTIONS}
+      />
+    );
   }
 
   if (view === 'rules') {
     return <RulesModal onAccept={handleAcceptRules} onCancel={handleCancelRules} sectionId={selectedSection} isFullTest={testMode === 'full'} />;
+  }
+
+  if (view === 'summary') {
+    return (
+      <FullTestSummary
+        sectionResults={fullTestSectionResults}
+        sectionList={testSections}
+        onBack={() => {
+          setView('select');
+          setSelectedSection(null);
+          setTestMode(null);
+          setFullTestSectionResults({});
+        }}
+      />
+    );
   }
 
   return (
