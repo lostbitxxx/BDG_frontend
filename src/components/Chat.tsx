@@ -10,7 +10,7 @@ const Chat: React.FC = () => {
   const [message, setMessage] = useState("");
   const { messages: chatHistory, isLoading, sendMessage } = useChat();
   const { selected: character, affinityLevelInfo } = useCharacter();
-  const { level, label, xpInLevel, xpNeededForNextLevel, xpPerLevel } = affinityLevelInfo;
+  const { level, label, totalXp, xpInLevel, xpNeededForNextLevel, xpPerLevel } = affinityLevelInfo;
   const location = useLocation();
   const welcomeMessage = (location.state as { welcome?: string } | null)
     ?.welcome;
@@ -84,11 +84,16 @@ const Chat: React.FC = () => {
             }}
           >
             <strong>{label}</strong> (Level {level})
-            {xpNeededForNextLevel > 0 ? (
-              <> · <strong>{xpNeededForNextLevel}</strong> XP to next level</>
-            ) : (
-              <> · Max level</>
-            )}
+            <div style={{ marginTop: "2px" }}>
+              <div><strong>{totalXp}</strong> XP</div>
+              <div style={{ marginTop: "2px" }}>
+                {level >= 5 ? (
+                  <>Max level</>
+                ) : (
+                  <><strong>{xpNeededForNextLevel}</strong> XP to next level</>
+                )}
+              </div>
+            </div>
             <div
               style={{
                 marginTop: "4px",

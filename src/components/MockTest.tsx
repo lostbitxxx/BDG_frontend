@@ -4,8 +4,10 @@ import Header from "./Header";
 import AudioRecorder from "./AudioRecorder";
 import { audioService } from "../services/api";
 import { getQuestionsBySection, Question } from "../data/questions";
-import { COLORS, ROUTES } from "../constants";
+import { COLORS, ROUTES, API_BASE_URL } from "../constants";
 import { saveTestRecord, analyzeStrengthsWeaknesses, TestSectionScore } from "../services/testHistory";
+import { useCharacter } from "../context/CharacterContext";
+import { auth } from "../lib/firebase";
 
 // PSC Section Time Limits (in seconds)
 const SECTION_TIME_LIMITS: Record<number, number> = {
@@ -483,6 +485,7 @@ const QuestionPage: React.FC<{
   questions: Question[];
   onBack: () => void;
 }> = ({ section, questions, onBack }) => {
+  const { character, setAffinityFromBackend } = useCharacter();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -534,19 +537,72 @@ const QuestionPage: React.FC<{
     setIsAnalyzing(true);
     try {
       const uploadResult = await audioService.uploadAudio(recordedAudio.blob, `recording-${Date.now()}.webm`);
-      if (!uploadResult.success || !uploadResult.url) { setIsAnalyzing(false); return; }
+      if (!uploadResult.success || !uploadResult.url) {
+        setIsUploading(false);
+        setIsAnalyzing(false);
+        return;
+      }
 
       const expectedText = questions.map(q => q.content).join(' ');
-      const analyzeResponse = await fetch('http://localhost:3001/api/audio/analyze', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const firebaseUser = auth?.currentUser ?? null;
+        if (firebaseUser) {
+          const idToken = await firebaseUser.getIdToken();
+          if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+        }
+      } catch (_) {
+        // Firebase not ready or no ID token; continue without auth so analyze still runs
+      }
+      const fallbackToken = localStorage.getItem('token');
+      if (!headers['Authorization'] && fallbackToken) headers['Authorization'] = `Bearer ${fallbackToken}`;
+
+      const origin = API_BASE_URL.replace(/\/api\/?$/, '') || '';
+      const analyzeUrl = origin ? `${origin}/api/audio/analyze` : '/api/audio/analyze';
+      const analyzeResponse = await fetch(analyzeUrl, {
+        method: 'POST',
+        headers,
         body: JSON.stringify({ audioUrl: uploadResult.url, expectedText, section }),
       });
-      const result = await analyzeResponse.json();
+      const text = await analyzeResponse.text();
+      let result: Record<string, unknown>;
+      try {
+        result = JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        result = {
+          success: false,
+          error: analyzeResponse.status === 404
+            ? 'Analyze endpoint not found. Check that the backend is running and the URL is correct.'
+            : `Request failed (${analyzeResponse.status})`,
+        };
+      }
       setAnalysisResult(result);
 
+      // Update affinity/XP from backend response so UI shows new level
+      const raw = (result.affinityLevel != null || result.affinityXp != null
+        ? result
+        : result.affinity && typeof result.affinity === 'object'
+          ? result.affinity
+          : result.data && typeof result.data === 'object'
+            ? result.data
+            : null) as Record<string, unknown> | null;
+      if (raw && (raw.affinityLevel !== undefined || raw.affinity_level !== undefined || raw.affinityXp !== undefined || raw.affinity_xp !== undefined)) {
+        const level = Number(raw.affinityLevel ?? raw.affinity_level ?? raw.level ?? 1);
+        const xp = Number(raw.affinityXp ?? raw.affinity_xp ?? raw.xp ?? 0);
+        const xpInLevel = raw.affinityXpCurrentLevel ?? raw.affinity_xp_current_level ?? raw.xpInLevel;
+        const xpNeeded = raw.affinityXpNeededForLevel ?? raw.affinity_xp_needed_for_level ?? raw.xpPerLevel;
+        setAffinityFromBackend(character, {
+          affinityXp: xp,
+          affinityLevel: Math.max(1, level),
+          ...(xpInLevel != null && { affinityXpCurrentLevel: Number(xpInLevel) }),
+          ...(xpNeeded != null && { affinityXpNeededForLevel: Number(xpNeeded) }),
+        });
+      }
+
       // Save test result to Firestore
-      if (result.success && result.scores) {
-        const overall = result.scores.overall || 0;
+      const scores = result.scores as { overall?: number } | undefined;
+      if (result.success && scores) {
+        const overall = Number(scores.overall) || 0;
         const scoreData = calculatePSCScore(overall);
 
         const sectionScores: TestSectionScore[] = [
@@ -560,9 +616,9 @@ const QuestionPage: React.FC<{
 
         const { strengths, weaknesses } = analyzeStrengthsWeaknesses(sectionScores);
 
-        // Extract feedback from result
-        const feedbackEn = result.feedback?.overall_assessment_en || '';
-        const feedbackZh = result.feedback?.overall_assessment_zh || '';
+        const feedback = result.feedback as { overall_assessment_en?: string; overall_assessment_zh?: string } | undefined;
+        const feedbackEn = feedback?.overall_assessment_en ?? '';
+        const feedbackZh = feedback?.overall_assessment_zh ?? '';
 
         await saveTestRecord({
           userId: '', // Will be set by the service

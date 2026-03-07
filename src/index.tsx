@@ -12,11 +12,11 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <CharacterProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <CharacterProvider>
           <App />
-        </AuthProvider>
-      </CharacterProvider>
+        </CharacterProvider>
+      </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

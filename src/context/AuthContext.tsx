@@ -7,8 +7,7 @@ import React, {
 } from "react";
 import { authService } from "../services/api";
 import type { User } from "../types";
-import { useCharacter, type CharacterKey } from "../context/CharacterContext";
-
+import { auth, signInWithCustomToken, signOut as firebaseSignOut } from "../lib/firebase";
 
 interface AuthContextType {
   user: User | null;
@@ -23,33 +22,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(() => authService.getUser());
-  const { setCharacter } = useCharacter();
 
-  // Sync state if token becomes invalid/expired
+  // Restore Firebase session when we have a stored token (e.g. after refresh) so API calls use the correct user's ID token
   useEffect(() => {
     if (!authService.isAuthenticated()) {
       setUser(null);
+      return;
+    }
+    const token = authService.getToken();
+    if (token && !auth.currentUser) {
+      signInWithCustomToken(auth, token).catch(() => setUser(null));
     }
   }, []);
 
-  const login = useCallback(
-    (user: User, token: string) => {
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-      // Sync this account's character immediately
-      setCharacter((user.character ?? "bunny") as CharacterKey);
-      setUser(user);
-    },
-    [setCharacter],
-  );
+  const login = useCallback((user: User, token: string) => {
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
+    setUser(user);
+  }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await firebaseSignOut(auth);
+    } catch {
+      // ignore
+    }
     authService.logout();
     localStorage.removeItem("character");
-    // Reset to default character on logout
-    setCharacter("bunny");
     setUser(null);
-  }, [setCharacter]);
+  }, []);
 
   return (
     <AuthContext.Provider
