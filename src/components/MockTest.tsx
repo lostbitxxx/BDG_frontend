@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Header from "./Header";
 import AudioRecorder from "./AudioRecorder";
-import { audioService } from "../services/api";
+import { audioService, startTest, completeTest, type CompleteTestPayload } from "../services/api";
 import { getQuestionsBySection, Question } from "../data/questions";
 import { COLORS, ROUTES, API_BASE_URL } from "../constants";
 import { saveTestRecord, analyzeStrengthsWeaknesses, TestSectionScore } from "../services/testHistory";
@@ -593,9 +593,11 @@ const QuestionPage: React.FC<{
   isFullTest?: boolean;
   onNextSection?: (currentSection: number) => void;
   onSectionComplete?: (section: number, data: FullTestSectionResult) => void;
+  onCompleteTest?: (payload: CompleteTestPayload) => void;
+  sessionId?: string | null;
   sectionList?: TestSectionInfo[] | null;
   totalSections?: number;
-}> = ({ section, questions, onBack, isFullTest, onNextSection, onSectionComplete, sectionList, totalSections = 5 }) => {
+}> = ({ section, questions, onBack, isFullTest, onNextSection, onSectionComplete, onCompleteTest, sessionId, sectionList, totalSections = 5 }) => {
   const { character, setAffinityFromBackend } = useCharacter();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number } | null>(null);
@@ -611,17 +613,34 @@ const QuestionPage: React.FC<{
   const isSectionMode = section === 1 || section === 2;
   const currentQ = questions[currentQuestionIndex];
 
-  // Report section grade/GPA to parent for full-test summary when analysis succeeds
+  // Report section grade/GPA to parent for full-test summary when analysis succeeds; for section practice, call backend complete
   useEffect(() => {
-    if (!onSectionComplete || !analysisResult?.success) return;
+    if (!analysisResult?.success) return;
     const grades = analysisResult.sectionGrades as Record<number, string> | undefined;
     const gpas = analysisResult.sectionGPAs as Record<number, number> | undefined;
     const grade = grades?.[section];
     const gpa = gpas?.[section];
     if (grade != null && gpa != null) {
-      onSectionComplete(section, { grade, gpa: Number(gpa) });
+      onSectionComplete?.(section, { grade, gpa: Number(gpa) });
+      if (!isFullTest && sessionId && onCompleteTest) {
+        const scores = analysisResult.scores as { overall?: number; pass?: boolean } | undefined;
+        const overall = Number(scores?.overall) ?? 0;
+        const scoreData = calculatePSCScore(overall);
+        onCompleteTest({
+          type: 'partial',
+          partialSection: section,
+          totalScore: overall,
+          testGPA: Number(gpa),
+          level: scoreData.level,
+          grade: scoreData.grade,
+          pass: scoreData.pass,
+          sectionGrades: { [String(section)]: grade },
+          sectionGPAs: { [String(section)]: Number(gpa) },
+          completedSections: [section],
+        });
+      }
     }
-  }, [analysisResult, section, onSectionComplete]);
+  }, [analysisResult, section, isFullTest, sessionId, onSectionComplete, onCompleteTest]);
 
   useEffect(() => {
     if (isTimerRunning && !recordedAudio) {
@@ -770,22 +789,28 @@ const QuestionPage: React.FC<{
         const feedbackEn = feedback?.overall_assessment_en ?? '';
         const feedbackZh = feedback?.overall_assessment_zh ?? '';
 
-        await saveTestRecord({
-          userId: '', // Will be set by the service
-          testDate: new Date(),
-          overallScore: overall,
-          level: scoreData.level,
-          grade: scoreData.grade,
-          sectionScores,
-          strengths,
-          weaknesses,
-          feedbackEn,
-          feedbackZh,
-          totalQuestions: questions.length,
-          correctAnswers: Math.round(overall * questions.length / 100),
-          testType: 'section',
-          sectionId: section
-        });
+        if (auth.currentUser) {
+          try {
+            await saveTestRecord({
+              userId: '', // Set by service from auth.currentUser
+              testDate: new Date(),
+              overallScore: overall,
+              level: scoreData.level,
+              grade: scoreData.grade,
+              sectionScores,
+              strengths,
+              weaknesses,
+              feedbackEn,
+              feedbackZh,
+              totalQuestions: questions.length,
+              correctAnswers: Math.round(overall * questions.length / 100),
+              testType: 'section',
+              sectionId: section
+            });
+          } catch (e) {
+            console.error('Failed to save test record to history:', e);
+          }
+        }
       }
     } catch (error) { console.error('Error:', error); }
     finally { setIsUploading(false); setIsAnalyzing(false); }
@@ -998,6 +1023,7 @@ const MockTest: React.FC = () => {
   const [testMode, setTestMode] = useState<'full' | 'section' | null>(null);
   const [testSections, setTestSections] = useState<TestSectionInfo[] | null>(null);
   const [fullTestSectionResults, setFullTestSectionResults] = useState<Record<number, FullTestSectionResult>>({});
+  const [testSessionId, setTestSessionId] = useState<string | null>(null);
 
   const handleSelectSection = async (section: 1 | 2 | 3 | 4 | 5) => {
     setSelectedSection(section);
@@ -1015,6 +1041,13 @@ const MockTest: React.FC = () => {
   }, []);
 
   const handleAcceptRules = async () => {
+    const mode = testMode === 'full' ? 'full' : 'partial';
+    const startResult = await startTest({
+      type: mode,
+      section: mode === 'partial' ? (selectedSection ?? undefined) : undefined,
+    });
+    if (startResult.sessionId) setTestSessionId(startResult.sessionId);
+
     setView('question');
     setIsLoading(true);
 
@@ -1038,14 +1071,53 @@ const MockTest: React.FC = () => {
     setView('select');
     setSelectedSection(null);
     setTestMode(null);
+    setTestSessionId(null);
   };
 
   const handleSectionComplete = useCallback((section: number, data: FullTestSectionResult) => {
     setFullTestSectionResults((prev) => ({ ...prev, [section]: data }));
   }, []);
 
+  const handleCompleteSectionTest = useCallback(
+    async (payload: CompleteTestPayload) => {
+      if (testSessionId) {
+        await completeTest(testSessionId, payload);
+        setTestSessionId(null);
+      }
+    },
+    [testSessionId],
+  );
+
   const handleNextSection = useCallback(async (currentSection: number) => {
     if (currentSection >= 5) {
+      if (testSessionId) {
+        const sectionIds = [1, 2, 3, 4, 5] as const;
+        const completed = sectionIds.filter((id) => fullTestSectionResults[id]);
+        const testGPA =
+          completed.length > 0
+            ? completed.reduce((sum, id) => sum + fullTestSectionResults[id].gpa, 0) / completed.length
+            : 0;
+        const sectionGrades: Record<string, string> = {};
+        const sectionGPAs: Record<string, number> = {};
+        completed.forEach((id) => {
+          sectionGrades[String(id)] = fullTestSectionResults[id].grade;
+          sectionGPAs[String(id)] = fullTestSectionResults[id].gpa;
+        });
+        const totalScore = testGPA * 25;
+        const scoreData = calculatePSCScore(totalScore);
+        await completeTest(testSessionId, {
+          type: 'full',
+          totalScore,
+          testGPA,
+          level: scoreData.level,
+          grade: scoreData.grade,
+          pass: scoreData.pass,
+          sectionGrades,
+          sectionGPAs,
+          completedSections: [...completed],
+        });
+        setTestSessionId(null);
+      }
       setView('summary');
       return;
     }
@@ -1069,7 +1141,7 @@ const MockTest: React.FC = () => {
       setIsLoading(false);
     }
     setView('question');
-  }, []);
+  }, [testSessionId, fullTestSectionResults]);
 
   if (view === 'question' && selectedSection) {
     if (isLoading) {
@@ -1083,10 +1155,12 @@ const MockTest: React.FC = () => {
       <QuestionPage
         section={selectedSection}
         questions={questions}
-        onBack={() => setView('select')}
+        onBack={() => { setTestSessionId(null); setView('select'); }}
         isFullTest={testMode === 'full'}
         onNextSection={testMode === 'full' ? handleNextSection : undefined}
         onSectionComplete={testMode === 'full' ? handleSectionComplete : undefined}
+        onCompleteTest={testMode === 'section' && testSessionId ? handleCompleteSectionTest : undefined}
+        sessionId={testSessionId}
         sectionList={testMode === 'full' ? testSections : null}
         totalSections={TOTAL_SECTIONS}
       />
@@ -1107,6 +1181,7 @@ const MockTest: React.FC = () => {
           setSelectedSection(null);
           setTestMode(null);
           setFullTestSectionResults({});
+          setTestSessionId(null);
         }}
       />
     );

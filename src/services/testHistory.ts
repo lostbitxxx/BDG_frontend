@@ -1,7 +1,13 @@
 // Test History Firestore Service
 import { db } from '../lib/firebase';
-import { collection, addDoc, query, where, orderBy, getDocs, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, getDocs, doc, deleteDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { auth } from '../lib/firebase';
+
+function toDate(val: unknown): Date {
+  if (!val) return new Date();
+  if (typeof (val as { toDate?: () => Date }).toDate === 'function') return (val as Timestamp).toDate();
+  return new Date(val as string | number);
+}
 
 export interface TestSectionScore {
   sectionId: number;
@@ -40,7 +46,7 @@ export interface PracticeRecord {
   correctAnswers: number;
 }
 
-// Save a new test record
+// Save a new test record (requires user to be signed in)
 export async function saveTestRecord(record: Omit<TestRecord, 'id'>): Promise<string> {
   const user = auth.currentUser;
   if (!user) throw new Error('User not authenticated');
@@ -48,7 +54,7 @@ export async function saveTestRecord(record: Omit<TestRecord, 'id'>): Promise<st
   const docRef = await addDoc(collection(db, 'testRecords'), {
     ...record,
     userId: user.uid,
-    testDate: record.testDate.toISOString(),
+    testDate: Timestamp.fromDate(record.testDate instanceof Date ? record.testDate : new Date(record.testDate)),
   });
 
   return docRef.id;
@@ -59,18 +65,22 @@ export async function getTestRecords(): Promise<TestRecord[]> {
   const user = auth.currentUser;
   if (!user) return [];
 
-  const q = query(
-    collection(db, 'testRecords'),
-    where('userId', '==', user.uid),
-    orderBy('testDate', 'desc')
-  );
+  try {
+    const q = query(
+      collection(db, 'testRecords'),
+      where('userId', '==', user.uid),
+      orderBy('testDate', 'desc')
+    );
 
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-    testDate: doc.data().testDate.toDate ? doc.data().testDate.toDate() : new Date(doc.data().testDate)
-  })) as TestRecord[];
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(d => {
+      const data = d.data();
+      return { id: d.id, ...data, testDate: toDate(data.testDate) } as TestRecord;
+    });
+  } catch (err) {
+    console.error('getTestRecords failed (e.g. missing Firestore index):', err);
+    return [];
+  }
 }
 
 // Get a single test record by ID
@@ -79,11 +89,8 @@ export async function getTestRecord(id: string): Promise<TestRecord | null> {
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
-    return {
-      id: docSnap.id,
-      ...docSnap.data(),
-      testDate: docSnap.data().testDate.toDate ? docSnap.data().testDate.toDate() : new Date(docSnap.data().testDate)
-    } as TestRecord;
+    const data = docSnap.data();
+    return { id: docSnap.id, ...data, testDate: toDate(data.testDate) } as TestRecord;
   }
   return null;
 }
@@ -113,18 +120,21 @@ export async function getPracticeRecords(): Promise<PracticeRecord[]> {
   const user = auth.currentUser;
   if (!user) return [];
 
-  const q = query(
-    collection(db, 'practiceRecords'),
-    where('userId', '==', user.uid),
-    orderBy('practiceDate', 'desc')
-  );
-
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-    practiceDate: doc.data().practiceDate.toDate ? doc.data().practiceDate.toDate() : new Date(doc.data().practiceDate)
-  })) as PracticeRecord[];
+  try {
+    const q = query(
+      collection(db, 'practiceRecords'),
+      where('userId', '==', user.uid),
+      orderBy('practiceDate', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(d => {
+      const data = d.data();
+      return { id: d.id, ...data, practiceDate: toDate(data.practiceDate) } as PracticeRecord;
+    });
+  } catch (err) {
+    console.error('getPracticeRecords failed:', err);
+    return [];
+  }
 }
 
 // Calculate strengths and weaknesses from section scores
