@@ -3,6 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { authService } from "../services/api";
 import { COLORS, ROUTES } from "../constants";
 import Header from "./Header";
+import { useAuth } from "../context/AuthContext";
+import { useCharacter } from "../context/CharacterContext";
+import { auth, signInWithCustomToken } from "../lib/firebase";
 
 interface FormData {
   username: string;
@@ -21,6 +24,8 @@ interface FormErrors {
 
 const SignUp: React.FC = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
+  const { setCharacter, setAffinityFromAuth } = useCharacter();
   const [formData, setFormData] = useState<FormData>({
     username: "",
     email: "",
@@ -87,11 +92,17 @@ const SignUp: React.FC = () => {
         password: formData.password,
       });
 
-      if (result.success) {
-        navigate(ROUTES.SIGNIN, {
-          state: {
-            welcome: `Account created! Welcome, ${result.user?.username}! 🎉`,
-          },
+      if (result.success && result.user && result.token) {
+        login(result.user, result.token);
+        setCharacter((result.user.character ?? "bunny") as "bunny" | "cat" | "owl");
+        setAffinityFromAuth({ affinityXp: 0, affinityLevel: 1 });
+        try {
+          await signInWithCustomToken(auth, result.token);
+        } catch (e) {
+          console.warn("Firebase sign-in with custom token failed:", e);
+        }
+        navigate(ROUTES.CHAT, {
+          state: { welcome: `Welcome, ${result.user.username}! 🎉` },
         });
       } else {
         setErrors({

@@ -1,38 +1,52 @@
 // ─── API Configuration ────────────────────────────────────────
 import type { AuthResponse, ChatResponse } from '../types';
+import { auth } from '../lib/firebase';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 // ─── Helpers ─────────────────────────────────────────────────
-function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('token');
+/** Use current Firebase user's ID token so backend gets the correct account; fallback to stored token. */
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  let token: string | null = null;
+  if (auth.currentUser) {
+    try {
+      token = await auth.currentUser.getIdToken();
+    } catch {
+      token = localStorage.getItem('token');
+    }
+  } else {
+    token = localStorage.getItem('token');
+  }
   return token
     ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
     : { 'Content-Type': 'application/json' };
 }
 
-async function post<T>(path: string, body: unknown, auth = false): Promise<T> {
+async function post<T>(path: string, body: unknown, useAuth = false): Promise<T> {
+  const headers = useAuth ? await getAuthHeaders() : { 'Content-Type': 'application/json' };
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: auth ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body)
   });
   return res.json();
 }
 
 async function put<T>(path: string, body: unknown): Promise<T> {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers,
     body: JSON.stringify(body)
   });
   return res.json();
 }
 
 async function get<T>(path: string): Promise<T> {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
-    headers: getAuthHeaders()
+    headers
   });
   return res.json();
 }
@@ -124,7 +138,7 @@ export const authService = {
   /** Verify token and get current user + affinity (fallback when getAffinity is not available). */
   async verify(): Promise<{ success: boolean; user?: { _id: string; email?: string; username?: string; character?: string }; affinityXp?: number; affinityLevel?: number; error?: string }> {
     try {
-      const result = await get<{ success: boolean; user?: unknown; affinityXp?: number; affinityLevel?: number; error?: string }>('/api/auth/verify');
+      const result = await get<{ success: boolean; user?: { _id: string; email?: string; username?: string; character?: string }; affinityXp?: number; affinityLevel?: number; error?: string }>('/api/auth/verify');
       return result;
     } catch {
       return { success: false, error: 'Verify failed.' };

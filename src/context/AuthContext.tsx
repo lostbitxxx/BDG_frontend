@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { authService } from "../services/api";
 import type { User } from "../types";
+import { auth, signInWithCustomToken, signOut as firebaseSignOut } from "../lib/firebase";
 
 interface AuthContextType {
   user: User | null;
@@ -22,10 +23,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(() => authService.getUser());
 
-  // Sync state if token becomes invalid/expired
+  // Restore Firebase session when we have a stored token (e.g. after refresh) so API calls use the correct user's ID token
   useEffect(() => {
     if (!authService.isAuthenticated()) {
       setUser(null);
+      return;
+    }
+    const token = authService.getToken();
+    if (token && !auth.currentUser) {
+      signInWithCustomToken(auth, token).catch(() => setUser(null));
     }
   }, []);
 
@@ -35,7 +41,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setUser(user);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await firebaseSignOut(auth);
+    } catch {
+      // ignore
+    }
     authService.logout();
     localStorage.removeItem("character");
     setUser(null);

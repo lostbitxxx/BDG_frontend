@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { authService } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useCharacter } from "../context/CharacterContext";
+import { auth, signInWithCustomToken } from "../lib/firebase";
 import { COLORS, ROUTES } from "../constants";
 import Header from "./Header";
 
@@ -67,6 +68,11 @@ const SignIn: React.FC = () => {
       if (result.success && result.user && result.token) {
         login(result.user, result.token);
         setCharacter((result.user.character ?? "bunny") as "bunny" | "cat" | "owl");
+        try {
+          await signInWithCustomToken(auth, result.token);
+        } catch (e) {
+          console.warn("Firebase sign-in with custom token failed:", e);
+        }
         const authRes = result as { affinityXp?: number; affinityLevel?: number };
         if (authRes.affinityXp !== undefined || authRes.affinityLevel !== undefined) {
           setAffinityFromAuth({

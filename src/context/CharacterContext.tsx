@@ -119,6 +119,8 @@ const CharacterContext = createContext<CharacterContextType>({
 });
 
 const AFFINITY_STORAGE_KEY_PREFIX = 'backendAffinityByCharacter';
+/** Don't overwrite affinity with getAffinity/verify for this long after a test result (ms). */
+const AFFINITY_TEST_GRACE_MS = 60000;
 
 function getAffinityStorageKey(userId: string | undefined): string {
   return userId ? `${AFFINITY_STORAGE_KEY_PREFIX}_${userId}` : `${AFFINITY_STORAGE_KEY_PREFIX}_guest`;
@@ -159,19 +161,20 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
   const prevStorageKeyRef = useRef<string | null>(null);
   const lastSetFromTestRef = useRef<number>(0);
 
-  // When user changes: logout -> clear affinity; login -> fetch from API then fall back to localStorage
+  // When user changes: logout -> clear affinity; login -> clear previous user's data first, then fetch from API
   useEffect(() => {
     if (prevStorageKeyRef.current === storageKey) return;
     prevStorageKeyRef.current = storageKey;
-    lastSetFromTestRef.current = 0; // reset when user actually changes so we do apply API data for new user
+    lastSetFromTestRef.current = 0;
 
     if (!userId) {
-      // Logout: clear affinity so we never show the previous user's XP
       setBackendAffinityByCharacter({});
       return;
     }
 
-    // Login or switch user: fetch affinity from API (getAffinity or verify), then fall back to localStorage
+    // Immediately show this user's cached data (or empty) so we never persist the previous user's XP to this user's key
+    setBackendAffinityByCharacter(loadAffinityFromStorage(storageKey));
+
     let cancelled = false;
     const applyAffinity = (affinityXp?: number, affinityLevel?: number) => {
       if (affinityXp !== undefined || affinityLevel !== undefined) {
@@ -186,7 +189,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
     authService.getAffinity()
       .then((res) => {
         if (cancelled) return;
-        if (Date.now() - lastSetFromTestRef.current < 15000) return;
+        if (Date.now() - lastSetFromTestRef.current < AFFINITY_TEST_GRACE_MS) return;
         if (res.success && (res.affinityXp !== undefined || res.affinityLevel !== undefined)) {
           applyAffinity(res.affinityXp, res.affinityLevel);
           return;
@@ -195,7 +198,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
       })
       .then((res) => {
         if (res == null || cancelled) return;
-        if (Date.now() - lastSetFromTestRef.current < 15000) return;
+        if (Date.now() - lastSetFromTestRef.current < AFFINITY_TEST_GRACE_MS) return;
         if (res.affinityXp !== undefined || res.affinityLevel !== undefined) {
           applyAffinity(res.affinityXp, res.affinityLevel);
         } else {
@@ -203,7 +206,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch(() => {
-        if (!cancelled && Date.now() - lastSetFromTestRef.current >= 15000) {
+        if (!cancelled && Date.now() - lastSetFromTestRef.current >= AFFINITY_TEST_GRACE_MS) {
           setBackendAffinityByCharacter(loadAffinityFromStorage(storageKey));
         }
       });
