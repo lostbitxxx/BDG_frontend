@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import Header from "./Header";
 import AudioRecorder from "./AudioRecorder";
 import { audioService, startTest, completeTest, type CompleteTestPayload } from "../services/api";
+import FloatingChatButton from "./FloatingChatButton";
+
 import { getQuestionsBySection, Question } from "../data/questions";
 import { COLORS, ROUTES, API_BASE_URL } from "../constants";
 import { saveTestRecord, analyzeStrengthsWeaknesses, TestSectionScore } from "../services/testHistory";
@@ -837,6 +839,7 @@ const QuestionPage: React.FC<{
   return (
     <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
       <Header />
+      <FloatingChatButton />
       <main style={{ padding: "24px 20px", maxWidth: "1000px", margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
           <button onClick={onBack} style={{ padding: "8px 16px", fontSize: "14px", backgroundColor: "white", border: "1px solid #e0e0e0", borderRadius: "8px", cursor: "pointer" }}>
