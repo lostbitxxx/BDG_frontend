@@ -7,6 +7,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Hide scrollbar on landing page only */
+body.landing-page {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+body.landing-page::-webkit-scrollbar {
+  display: none;
+}
+
 * {
   box-sizing: border-box;
 }

@@ -14,6 +14,8 @@ const EMERALD = {
   600: "#059669",
 };
 
+const CHAT_LEFT_GRADIENT = "linear-gradient(135deg, #7eb8e0 0%, #a8d4f0 50%, #c5e3f7 100%)";
+
 const Chat: React.FC = () => {
   const [message, setMessage] = useState("");
   const chatMessagesRef = useRef<HTMLDivElement>(null);
@@ -63,95 +65,58 @@ const Chat: React.FC = () => {
   );
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", backgroundColor: "#f8f9fa" }}>
       <Header />
 
-      <div style={{ display: "flex", justifyContent: "center", height: "calc(100vh - 120px)", padding: "0 24px" }}>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 0 }}>
-          {/* Character panel - larger, overlaps into chat */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
+        {/* Left: Bird peeking in (no scroll) — same 2-column layout as landing */}
+        <div
+          style={{
+            flex: "0 0 50%",
+            position: "relative",
+            overflow: "hidden",
+            background: CHAT_LEFT_GRADIENT,
+            minHeight: 0,
+          }}
+        >
           <div
             style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              padding: "20px 0",
-              gap: "12px",
-              flexShrink: 0,
-              marginRight: -80,
-              zIndex: 2,
+              position: "absolute",
+              right: 0,
+              top: "50%",
+              transform: "translateY(-50%) translateX(200px)",
+              width: "180vmin",
+              height: "180vmin",
+              maxWidth: "180%",
+              maxHeight: "180%",
             }}
           >
-            <div
-              style={{
-                width: "480px",
-                height: "480px",
-                borderRadius: "16px",
-                backgroundColor: character.transparentBackground ? "transparent" : "white",
-                overflow: "hidden",
-              }}
-            >
-              <RiveComponent style={{ width: "100%", height: "100%" }} />
-            </div>
-            <div style={{ fontSize: "15px", fontWeight: "600", color: COLORS.primary }}>
-              {character.emoji} {character.name}
-            </div>
-            <div
+            <RiveComponent
               style={{
                 width: "100%",
-                maxWidth: 220,
-                fontSize: "13px",
-                color: COLORS.muted,
-                backgroundColor: "#f3f4f6",
-                padding: "12px 14px",
-                borderRadius: "12px",
+                height: "100%",
+                backgroundColor: "transparent",
               }}
-            >
-              <strong>{label}</strong> (Level {level})
-              <div style={{ marginTop: "4px" }}>
-                <div><strong>{totalXp}</strong> XP</div>
-                <div style={{ marginTop: "2px" }}>
-                  {level >= 5 ? <>Max level</> : <><strong>{xpNeededForNextLevel}</strong> XP to next level</>}
-                </div>
-              </div>
-              <div
-                style={{
-                  marginTop: "8px",
-                  width: "100%",
-                  height: "6px",
-                  borderRadius: 999,
-                  backgroundColor: "#e5e7eb",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    width: `${(xpInLevel / xpPerLevel) * 100}%`,
-                    height: "100%",
-                    borderRadius: 999,
-                    backgroundColor: COLORS.secondary,
-                    transition: "width 0.3s ease",
-                  }}
-                />
-              </div>
-            </div>
+            />
           </div>
         </div>
 
-        {/* Chat area - Memory Garden style */}
+        {/* Right: single white column — welcome, XP, header, messages (scroll), input */}
         <div
           style={{
-            width: 640,
-            minWidth: 480,
-            padding: "20px 0 20px 24px",
+            flex: 1,
+            minWidth: 0,
+            backgroundColor: "white",
             display: "flex",
             flexDirection: "column",
-            minHeight: 0,
-            zIndex: 1,
+            overflow: "hidden",
+            padding: "24px 32px 32px",
           }}
         >
           {welcomeMessage && (
             <div
               style={{
+                flexShrink: 0,
                 backgroundColor: EMERALD[50],
                 color: EMERALD[600],
                 padding: "10px 16px",
@@ -165,196 +130,227 @@ const Chat: React.FC = () => {
             </div>
           )}
 
+          {/* Full-width XP module: left = character (Stranger) + companion, center = bar, right = XP text */}
           <div
             style={{
-              flex: 1,
-              minHeight: 0,
+              flexShrink: 0,
+              width: "100%",
               display: "flex",
-              flexDirection: "column",
-              backgroundColor: "white",
-              borderRadius: "32px",
-              overflow: "hidden",
+              alignItems: "center",
+              gap: "16px",
+              backgroundColor: "#f3f4f6",
+              padding: "14px 20px",
+              borderRadius: "16px",
+              marginBottom: "20px",
             }}
           >
-            {/* Chat header - Memory Garden style */}
-            <div style={{ padding: "24px", flexShrink: 0, backgroundColor: "white" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: "50%",
-                    backgroundColor: EMERALD[200],
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "18px",
-                  }}
-                >
-                  {character.emoji}
-                </div>
+            {/* Left: character name (label) + your learning companion */}
+            <div style={{ flexShrink: 0, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "20px" }}>{character.emoji}</span>
                 <div>
-                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
-                    {character.name}
+                  <div style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
+                    {character.name} ({label})
                   </div>
-                  <div style={{ fontSize: "12px", color: EMERALD[600], fontWeight: 500 }}>
+                  <div style={{ fontSize: "12px", color: "#6b7280", fontWeight: 500 }}>
                     Your learning companion
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Messages - Memory Garden bubbles */}
+            {/* Center: XP bar */}
             <div
-              ref={chatMessagesRef}
               style={{
                 flex: 1,
-                overflowY: "auto",
-                padding: "24px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-                minHeight: 0,
+                minWidth: 0,
+                height: "10px",
+                borderRadius: 999,
+                backgroundColor: "#e5e7eb",
+                overflow: "hidden",
               }}
             >
-              {chatHistory.length === 0 && !isLoading && (
+              <div
+                style={{
+                  width: `${xpPerLevel > 0 ? (xpInLevel / xpPerLevel) * 100 : 0}%`,
+                  height: "100%",
+                  borderRadius: 999,
+                  backgroundColor: COLORS.secondary,
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+
+            {/* Right: total XP (Level N), XP to next level */}
+            <div
+              style={{
+                flexShrink: 0,
+                fontSize: "13px",
+                color: COLORS.muted,
+                textAlign: "right",
+              }}
+            >
+              <div style={{ fontWeight: 600, color: "#1f2937" }}>
+                {totalXp} XP (Level {level})
+              </div>
+              <div style={{ marginTop: "2px" }}>
+                {level >= 5 ? "Max level" : `${xpNeededForNextLevel} XP to next level`}
+              </div>
+            </div>
+          </div>
+
+          {/* Messages — only scrollable area */}
+          <div
+            ref={chatMessagesRef}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            {chatHistory.length === 0 && !isLoading && (
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <p style={{ color: "#9ca3af", textAlign: "center", marginBottom: "24px" }}>
+                  Your conversation will appear here.
+                  <br />
+                  Start by sending a message to {character.name}.
+                </p>
                 <div
                   style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <p style={{ color: "#9ca3af", textAlign: "center", marginBottom: "24px" }}>
-                    Your conversation will appear here.
-                    <br />
-                    Start by sending a message to {character.name}.
-                  </p>
-                  <div
-                  style={{
-                    backgroundColor: "white",
-                    borderRadius: "32px",
+                    backgroundColor: "#f9fafb",
+                    borderRadius: "16px",
                     padding: "24px",
                     maxWidth: 320,
-                  }}
-                  >
-                    <div style={{ marginBottom: "8px", color: "#9ca3af", fontWeight: 600, fontSize: "13px" }}>
-                      Example
-                    </div>
-                    <p style={{ color: "#6b7280", lineHeight: 1.6, fontStyle: "italic", margin: 0 }}>
-                      Ask me anything about Mandarin practice, or say hello!
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {chatHistory.map((msg) => (
-                <div
-                  key={msg.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: msg.type === "user" ? "flex-end" : "flex-start",
+                    border: "1px solid #e5e7eb",
                   }}
                 >
-                  <div
-                    style={{
-                      maxWidth: "85%",
-                      padding: "12px 16px",
-                      borderRadius: "16px",
-                      backgroundColor: msg.type === "user" ? EMERALD[600] : EMERALD[50],
-                      color: msg.type === "user" ? "white" : "#1f2937",
-                      fontSize: "14px",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    <p style={{ margin: 0 }}>{msg.content}</p>
+                  <div style={{ marginBottom: "8px", color: "#9ca3af", fontWeight: 600, fontSize: "13px" }}>
+                    Example
                   </div>
+                  <p style={{ color: "#6b7280", lineHeight: 1.6, fontStyle: "italic", margin: 0 }}>
+                    Ask me anything about Mandarin practice, or say hello!
+                  </p>
                 </div>
-              ))}
+              </div>
+            )}
 
-              {isLoading && (
-                <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                  <div
-                    style={{
-                      maxWidth: "85%",
-                      padding: "12px 16px",
-                      borderRadius: "16px",
-                      backgroundColor: EMERALD[50],
-                      color: "#1f2937",
-                      fontSize: "14px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 16,
-                        height: 16,
-                        borderRadius: "50%",
-                        border: `2px solid ${EMERALD[500]}`,
-                        borderTopColor: "transparent",
-                        animation: "spin 0.8s linear infinite",
-                      }}
-                    />
-                    <span>{character.name} is thinking...</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Chat input - Memory Garden style */}
-            <div style={{ padding: "24px", flexShrink: 0 }}>
-              <form
-                onSubmit={(e) => handleSendMessage(e)}
-                style={{ display: "flex", gap: "12px", alignItems: "center" }}
+            {chatHistory.map((msg) => (
+              <div
+                key={msg.id}
+                style={{
+                  display: "flex",
+                  justifyContent: msg.type === "user" ? "flex-end" : "flex-start",
+                }}
               >
-                <input
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder={`Message ${character.name}...`}
-                  disabled={isLoading}
+                <div
                   style={{
-                    flex: 1,
-                    padding: "12px 20px",
-                    border: "2px solid #d1d5db",
-                    borderRadius: "9999px",
-                    fontSize: "15px",
-                    color: "#1f2937",
-                    outline: "none",
-                    backgroundColor: "white",
+                    maxWidth: "85%",
+                    padding: "12px 16px",
+                    borderRadius: "16px",
+                    backgroundColor: msg.type === "user" ? EMERALD[600] : EMERALD[50],
+                    color: msg.type === "user" ? "white" : "#1f2937",
+                    fontSize: "14px",
+                    lineHeight: 1.5,
                   }}
-                />
-                <button
-                  type="submit"
-                  disabled={isLoading || !message.trim()}
+                >
+                  <p style={{ margin: 0 }}>{msg.content}</p>
+                </div>
+              </div>
+            ))}
+
+            {isLoading && (
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <div
                   style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: "50%",
-                    border: "none",
-                    backgroundColor: isLoading || !message.trim() ? "#d1d5db" : EMERALD[600],
-                    color: "white",
-                    cursor: isLoading || !message.trim() ? "not-allowed" : "pointer",
+                    maxWidth: "85%",
+                    padding: "12px 16px",
+                    borderRadius: "16px",
+                    backgroundColor: EMERALD[50],
+                    color: "#1f2937",
+                    fontSize: "14px",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
+                    gap: "8px",
                   }}
                 >
-                  <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              </form>
-            </div>
+                  <div
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      border: `2px solid ${EMERALD[500]}`,
+                      borderTopColor: "transparent",
+                      animation: "spin 0.8s linear infinite",
+                    }}
+                  />
+                  <span>{character.name} is thinking...</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Input row — no extra container */}
+          <div style={{ flexShrink: 0, paddingTop: "16px" }}>
+            <form
+              onSubmit={(e) => handleSendMessage(e)}
+              style={{ display: "flex", gap: "12px", alignItems: "center" }}
+            >
+              <input
+                type="text"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder={`Message ${character.name}...`}
+                disabled={isLoading}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "12px 20px",
+                  border: "2px solid #d1d5db",
+                  borderRadius: "9999px",
+                  fontSize: "15px",
+                  color: "#1f2937",
+                  outline: "none",
+                  backgroundColor: "white",
+                }}
+              />
+              <button
+                type="submit"
+                disabled={isLoading || !message.trim()}
+                style={{
+                  flexShrink: 0,
+                  width: 48,
+                  height: 48,
+                  borderRadius: "50%",
+                  border: "none",
+                  backgroundColor: isLoading || !message.trim() ? "#d1d5db" : EMERALD[600],
+                  color: "white",
+                  cursor: isLoading || !message.trim() ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </form>
           </div>
         </div>
       </div>
