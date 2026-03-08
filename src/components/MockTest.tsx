@@ -15,13 +15,13 @@ import { auth } from "../lib/firebase";
 // Section 1: 3.5 min (210s) - 100 single characters
 // Section 2: 2.5 min (150s) - 50 polysyllabic words
 // Section 3: 3 min (180s) - 25 choice questions
-// Section 4: 4 min (240s) - 400-character passage
+// Section 4: 5 min (300s) - 400-character passage
 // Section 5: 3 min (180s) - topic speaking
 const SECTION_TIME_LIMITS: Record<number, number> = {
   1: 210,  // 3.5 minutes
   2: 150,  // 2.5 minutes
   3: 180,  // 3 minutes
-  4: 240,  // 4 minutes
+  4: 300,  // 5 minutes
   5: 180,  // 3 minutes
 };
 
@@ -31,7 +31,7 @@ const SECTIONS = [
   { id: 1, title: "Section 1: 讀單音節字詞", description: "100 single characters - test basic syllables", timeLimit: "3.5 min", scoreWeight: "10%", icon: "📝" },
   { id: 2, title: "Section 2: 讀多音節詞語", description: "50 words - focus on tones, tone sandhi, neutral tone", timeLimit: "2.5 min", scoreWeight: "20%", icon: "📖" },
   { id: 3, title: "Section 3: 選擇判斷", description: "25 questions: vocabulary contrast, classifiers, grammar", timeLimit: "3 min", scoreWeight: "10%", icon: "❓" },
-  { id: 4, title: "Section 4: 朗讀短文", description: "Read 400-character passage", timeLimit: "4 min", scoreWeight: "30%", icon: "📄" },
+  { id: 4, title: "Section 4: 朗讀短文", description: "Read 400-character passage", timeLimit: "5 min", scoreWeight: "30%", icon: "📄" },
   { id: 5, title: "Section 5: 命題說話", description: "3-minute speech on topic", timeLimit: "3 min", scoreWeight: "30%", icon: "🎤" },
 ];
 
