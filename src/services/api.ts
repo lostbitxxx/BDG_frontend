@@ -393,3 +393,35 @@ export const audioService = {
     }
   }
 };
+
+// ─── Text-to-Speech (ElevenLabs) ─────────────────────────────────
+
+export async function generateTTS(
+  text: string,
+  gender: 'male' | 'female' = 'female'
+): Promise<{ success: boolean; audioUrl?: string; audioBase64?: string; error?: string }> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/api/audio/tts`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text, gender }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        error: errorData.error || `TTS failed with status ${res.status}`
+      };
+    }
+
+    return res.json();
+  } catch (err) {
+    console.error('TTS error:', err);
+    return { success: false, error: 'Failed to generate TTS. Please try again.' };
+  }
+}

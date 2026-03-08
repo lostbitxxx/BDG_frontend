@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Header from "./Header";
 import AudioRecorder from "./AudioRecorder";
-import { audioService, startTest, completeTest, type CompleteTestPayload } from "../services/api";
+import { audioService, startTest, completeTest, generateTTS, type CompleteTestPayload } from "../services/api";
 import FloatingChatButton from "./FloatingChatButton";
 
 import { getQuestionsBySection, Question } from "../data/questions";
@@ -611,6 +611,8 @@ const QuestionPage: React.FC<{
   const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob; duration: number } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isPlayingTTS, setIsPlayingTTS] = useState(false);
+  const [ttsAudio, setTtsAudio] = useState<HTMLAudioElement | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const apiSection = sectionList?.find((s) => s.section === section);
   const timeLimit = apiSection?.timeLimit ?? SECTION_TIME_LIMITS[section];
@@ -680,6 +682,43 @@ const QuestionPage: React.FC<{
   const handleRecordingStart = () => {
     setElapsedTime(0);
     setIsTimerRunning(true);
+  };
+
+  const handlePlayTTS = async (text: string) => {
+    if (isPlayingTTS && ttsAudio) {
+      ttsAudio.pause();
+      setIsPlayingTTS(false);
+      return;
+    }
+
+    setIsPlayingTTS(true);
+    try {
+      const result = await generateTTS(text, 'female');
+      if (result.success) {
+        // Use base64 audio if available, otherwise fall back to URL
+        let audioSrc: string;
+        if (result.audioBase64) {
+          audioSrc = `data:audio/mp3;base64,${result.audioBase64}`;
+        } else if (result.audioUrl) {
+          audioSrc = result.audioUrl;
+        } else {
+          throw new Error('No audio data available');
+        }
+        const audio = new Audio(audioSrc);
+        audio.onended = () => setIsPlayingTTS(false);
+        audio.onerror = () => {
+          console.error('Audio playback error');
+          setIsPlayingTTS(false);
+        };
+        setTtsAudio(audio);
+        await audio.play();
+      } else {
+        setIsPlayingTTS(false);
+      }
+    } catch (err) {
+      console.error('TTS error:', err);
+      setIsPlayingTTS(false);
+    }
   };
 
   const handleUpload = async () => {
@@ -877,7 +916,28 @@ const QuestionPage: React.FC<{
         <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "32px", marginBottom: "24px" }}>
           {isSectionMode && (
             <>
-              <div style={{ fontWeight: "600", color: COLORS.primary, marginBottom: "16px" }}>Words to Read ({questions.length}):</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                <div style={{ fontWeight: "600", color: COLORS.primary }}>Words to Read ({questions.length}):</div>
+                <button
+                  onClick={() => handlePlayTTS(questions.map((q: any) => q.content).join(' '))}
+                  disabled={isPlayingTTS}
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: "20px",
+                    border: "none",
+                    backgroundColor: isPlayingTTS ? COLORS.secondary : "#e3f2fd",
+                    color: isPlayingTTS ? "white" : COLORS.primary,
+                    cursor: isPlayingTTS ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "14px",
+                    fontWeight: "500"
+                  }}
+                >
+                  {isPlayingTTS ? "⏸ Stop" : "🔊 Play All"}
+                </button>
+              </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
                 {questions.map((q: any, idx: number) => (
                   <div key={q.id || idx} style={{ width: "70px", padding: "10px 4px", backgroundColor: "#f8f9fa", borderRadius: "8px", textAlign: "center", border: "1px solid #e0e0e0" }}>
@@ -899,7 +959,28 @@ const QuestionPage: React.FC<{
                   ))}
                 </div>
               </div>
-              <div style={{ fontSize: "20px", fontWeight: "600", marginBottom: "24px", color: COLORS.primary }}>{currentQ.content}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                <div style={{ fontSize: "20px", fontWeight: "600", color: COLORS.primary }}>{currentQ.content}</div>
+                <button
+                  onClick={() => handlePlayTTS(currentQ.content)}
+                  disabled={isPlayingTTS}
+                  style={{
+                    padding: "10px",
+                    borderRadius: "50%",
+                    border: "none",
+                    backgroundColor: isPlayingTTS ? COLORS.secondary : "#e3f2fd",
+                    color: isPlayingTTS ? "white" : COLORS.primary,
+                    cursor: isPlayingTTS ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "18px"
+                  }}
+                  title="Play audio"
+                >
+                  {isPlayingTTS ? "⏸" : "🔊"}
+                </button>
+              </div>
               {currentQ.pinyin && <div style={{ color: COLORS.muted, fontSize: "14px", marginBottom: "16px" }}>{currentQ.pinyin}</div>}
               {currentQ.options && <div>{currentQ.options.map((opt, optIdx) => <div key={optIdx} style={{ padding: "14px 16px", backgroundColor: "#f8f9fa", borderRadius: "8px", marginBottom: "8px" }}>{opt}</div>)}</div>}
             </>
@@ -908,7 +989,29 @@ const QuestionPage: React.FC<{
           {section === 4 && currentQ && (
             <>
               <div style={{ fontWeight: "600", color: COLORS.primary, marginBottom: "16px" }}>Read this passage aloud:</div>
-              <div style={{ fontSize: "18px", lineHeight: "2", padding: "24px", backgroundColor: "#f8f9fa", borderRadius: "12px", textAlign: "justify" }}>{currentQ.content}</div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                <div style={{ fontSize: "18px", lineHeight: "2", padding: "24px", backgroundColor: "#f8f9fa", borderRadius: "12px", textAlign: "justify", flex: 1 }}>{currentQ.content}</div>
+                <button
+                  onClick={() => handlePlayTTS(currentQ.content)}
+                  disabled={isPlayingTTS}
+                  style={{
+                    padding: "12px",
+                    borderRadius: "50%",
+                    border: "none",
+                    backgroundColor: isPlayingTTS ? COLORS.secondary : "#e3f2fd",
+                    color: isPlayingTTS ? "white" : COLORS.primary,
+                    cursor: isPlayingTTS ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "20px",
+                    marginTop: "8px"
+                  }}
+                  title="Play audio"
+                >
+                  {isPlayingTTS ? "⏸" : "🔊"}
+                </button>
+              </div>
               {currentQ.pinyin && <div style={{ marginTop: "16px", color: COLORS.muted, fontSize: "14px", fontStyle: "italic" }}>{currentQ.pinyin}</div>}
             </>
           )}
@@ -916,7 +1019,28 @@ const QuestionPage: React.FC<{
           {section === 5 && currentQ && (
             <>
               <div style={{ fontWeight: "600", color: COLORS.primary, marginBottom: "16px" }}>Speak about this topic for at least 3 minutes:</div>
-              <div style={{ fontSize: "24px", fontWeight: "bold", padding: "32px", backgroundColor: "#e3f2fd", borderRadius: "12px", textAlign: "center", color: "#1565c0" }}>{currentQ.content}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px" }}>
+                <div style={{ fontSize: "24px", fontWeight: "bold", padding: "32px", backgroundColor: "#e3f2fd", borderRadius: "12px", textAlign: "center", color: "#1565c0" }}>{currentQ.content}</div>
+                <button
+                  onClick={() => handlePlayTTS(currentQ.content)}
+                  disabled={isPlayingTTS}
+                  style={{
+                    padding: "14px",
+                    borderRadius: "50%",
+                    border: "none",
+                    backgroundColor: isPlayingTTS ? COLORS.secondary : "#e3f2fd",
+                    color: isPlayingTTS ? "white" : COLORS.primary,
+                    cursor: isPlayingTTS ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "22px"
+                  }}
+                  title="Play audio"
+                >
+                  {isPlayingTTS ? "⏸" : "🔊"}
+                </button>
+              </div>
               {currentQ.pinyin && <div style={{ marginTop: "16px", color: COLORS.muted, fontSize: "14px" }}>Keywords: {currentQ.pinyin}</div>}
             </>
           )}
@@ -1104,11 +1228,13 @@ const QuestionPage: React.FC<{
                           <div>Correct / 正确: <strong style={{ color: '#22c55e' }}>{(analysisResult.feedback as { tone_analysis: { correct_tones: number } }).tone_analysis.correct_tones}</strong></div>
                           <div>Accuracy / 准确率: <strong>{(analysisResult.feedback as { tone_analysis: { tone_accuracy: string } }).tone_analysis.tone_accuracy}</strong></div>
                         </div>
-                        {(analysisResult.feedback as { tone_analysis: { common_errors: string[] } }).tone_analysis.common_errors && (analysisResult.feedback as { tone_analysis: { common_errors: string[] } }).tone_analysis.common_errors.length > 0 && (
+                        {(analysisResult.feedback as { tone_analysis: { common_errors: any[] } }).tone_analysis.common_errors && (analysisResult.feedback as { tone_analysis: { common_errors: any[] } }).tone_analysis.common_errors.length > 0 && (
                           <div style={{ marginTop: '8px', fontSize: '12px' }}>
                             <span style={{ fontWeight: '600', color: '#666' }}>Common Errors / 常见错误: </span>
-                            {(analysisResult.feedback as { tone_analysis: { common_errors: string[] } }).tone_analysis.common_errors.map((err, i) => (
-                              <span key={i} style={{ display: 'inline-block', marginLeft: '4px', padding: '2px 6px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '4px', fontSize: '11px' }}>{err}</span>
+                            {(analysisResult.feedback as { tone_analysis: { common_errors: any[] } }).tone_analysis.common_errors.map((err, i) => (
+                              <span key={i} style={{ display: 'inline-block', marginLeft: '4px', padding: '2px 6px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '4px', fontSize: '11px' }}>
+                                {typeof err === 'string' ? err : (err.character ? `${err.character}: ${err.issue || err}` : JSON.stringify(err))}
+                              </span>
                             ))}
                           </div>
                         )}
@@ -1116,22 +1242,27 @@ const QuestionPage: React.FC<{
                     )}
 
                     {/* Phoneme Analysis Summary */}
-                    {(analysisResult.feedback as { phoneme_analysis?: { consonant_issues?: string[]; vowel_issues?: string[] } }).phoneme_analysis && (
+                    {/* Phoneme Analysis Summary - handle both string[] and object[] formats */}
+                    {(analysisResult.feedback as { phoneme_analysis?: { consonant_issues?: any[]; vowel_issues?: any[] } }).phoneme_analysis && (
                       <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#faf5ff', borderRadius: '8px' }}>
                         <h4 style={{ margin: "0 0 12px 0", color: '#7c3aed' }}>Phoneme Analysis / 音素分析</h4>
-                        {(analysisResult.feedback as { phoneme_analysis: { consonant_issues: string[] } }).phoneme_analysis.consonant_issues && (analysisResult.feedback as { phoneme_analysis: { consonant_issues: string[] } }).phoneme_analysis.consonant_issues.length > 0 && (
+                        {(analysisResult.feedback as { phoneme_analysis: { consonant_issues: any[] } }).phoneme_analysis.consonant_issues && (analysisResult.feedback as { phoneme_analysis: { consonant_issues: any[] } }).phoneme_analysis.consonant_issues.length > 0 && (
                           <div style={{ marginBottom: '8px' }}>
                             <div style={{ fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '4px' }}>Consonant / Initial Issues (声母问题):</div>
-                            {(analysisResult.feedback as { phoneme_analysis: { consonant_issues: string[] } }).phoneme_analysis.consonant_issues.map((issue, i) => (
-                              <span key={i} style={{ display: 'inline-block', marginRight: '4px', marginBottom: '4px', padding: '2px 8px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '4px', fontSize: '11px' }}>{issue}</span>
+                            {(analysisResult.feedback as { phoneme_analysis: { consonant_issues: any[] } }).phoneme_analysis.consonant_issues.map((item, i) => (
+                              <span key={i} style={{ display: 'inline-block', marginRight: '4px', marginBottom: '4px', padding: '2px 8px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '4px', fontSize: '11px' }}>
+                                {typeof item === 'string' ? item : `${item.character} (${item.issue})`}
+                              </span>
                             ))}
                           </div>
                         )}
-                        {(analysisResult.feedback as { phoneme_analysis: { vowel_issues: string[] } }).phoneme_analysis.vowel_issues && (analysisResult.feedback as { phoneme_analysis: { vowel_issues: string[] } }).phoneme_analysis.vowel_issues.length > 0 && (
+                        {(analysisResult.feedback as { phoneme_analysis: { vowel_issues: any[] } }).phoneme_analysis.vowel_issues && (analysisResult.feedback as { phoneme_analysis: { vowel_issues: any[] } }).phoneme_analysis.vowel_issues.length > 0 && (
                           <div>
                             <div style={{ fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '4px' }}>Vowel / Final Issues (韵母问题):</div>
-                            {(analysisResult.feedback as { phoneme_analysis: { vowel_issues: string[] } }).phoneme_analysis.vowel_issues.map((issue, i) => (
-                              <span key={i} style={{ display: 'inline-block', marginRight: '4px', marginBottom: '4px', padding: '2px 8px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '4px', fontSize: '11px' }}>{issue}</span>
+                            {(analysisResult.feedback as { phoneme_analysis: { vowel_issues: any[] } }).phoneme_analysis.vowel_issues.map((item, i) => (
+                              <span key={i} style={{ display: 'inline-block', marginRight: '4px', marginBottom: '4px', padding: '2px 8px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '4px', fontSize: '11px' }}>
+                                {typeof item === 'string' ? item : `${item.character} (${item.issue})`}
+                              </span>
                             ))}
                           </div>
                         )}
@@ -1226,7 +1357,8 @@ const MockTest: React.FC = () => {
 
     try {
       const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-      const response = await fetch('http://localhost:3001/api/questions/generate', {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/questions/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1304,7 +1436,8 @@ const MockTest: React.FC = () => {
     setIsLoading(true);
     try {
       const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-      const response = await fetch('http://localhost:3001/api/questions/generate', {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/questions/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

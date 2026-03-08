@@ -23,7 +23,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // Connect to backend Socket.IO
-    const newSocket = io('http://localhost:3001', {
+    const SOCKET_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    const newSocket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
     });
 

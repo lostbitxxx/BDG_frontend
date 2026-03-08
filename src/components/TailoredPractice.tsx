@@ -218,7 +218,8 @@ const TailoredPractice: React.FC = () => {
       const expectedText = currentQuestion?.content || '';
 
       // Analyze audio
-      const analyzeResponse = await fetch('http://localhost:3001/api/audio/analyze', {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const analyzeResponse = await fetch(`${API_URL}/api/audio/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audioUrl: uploadResult.url, expectedText, section: 'practice' }),
