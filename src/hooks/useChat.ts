@@ -1,9 +1,27 @@
 import { useState, useCallback } from 'react';
 import { chatService } from '../services/api';
 import type { ChatMessage } from '../types';
+import type { CharacterKey } from '../context/CharacterContext';
 import { CHAT } from '../constants';
 
-export function useChat() {
+// Voice gender preference
+export type VoiceGender = 'male' | 'female';
+
+const VOICE_PREFERENCE_KEY = 'voiceGender';
+
+export function getStoredVoiceGender(): VoiceGender {
+  const stored = localStorage.getItem(VOICE_PREFERENCE_KEY);
+  if (stored === 'male' || stored === 'female') {
+    return stored;
+  }
+  return 'female'; // default
+}
+
+export function setStoredVoiceGender(gender: VoiceGender): void {
+  localStorage.setItem(VOICE_PREFERENCE_KEY, gender);
+}
+
+export function useChat(characterKey?: CharacterKey) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -11,12 +29,12 @@ export function useChat() {
   const addMessage = useCallback((type: 'user' | 'ai', content: string, audioBase64?: string) => {
     setMessages(prev => [
       ...prev,
-      { 
-        id: `${Date.now()}-${type}`, 
-        type, 
-        content, 
+      {
+        id: `${Date.now()}-${type}`,
+        type,
+        content,
         audioBase64,
-        timestamp: new Date() 
+        timestamp: new Date()
       }
     ]);
   }, []);
@@ -32,10 +50,10 @@ export function useChat() {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
-      
+
       const audio = new Audio(url);
       audio.play().catch(err => console.error('Audio play error:', err));
-      
+
       // Cleanup after playing
       audio.onended = () => URL.revokeObjectURL(url);
     } catch (err) {
@@ -56,10 +74,11 @@ export function useChat() {
     setIsLoading(true);
 
     try {
-      const res = await chatService.sendMessage(message);
+      const voiceGender = getStoredVoiceGender();
+      const res = await chatService.sendMessage(message, characterKey, voiceGender);
       if (res.success) {
         addMessage('ai', res.response, res.audioBase64);
-        
+
         // Auto-play TTS if available
         if (res.audioBase64) {
           setTimeout(() => playAudio(res.audioBase64!), 500);
@@ -76,7 +95,7 @@ export function useChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, addMessage, playAudio]);
+  }, [isLoading, addMessage, playAudio, characterKey]);
 
   const clearMessages = useCallback(() => setMessages([]), []);
 

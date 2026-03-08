@@ -1,6 +1,16 @@
 /**
  * PSC Question Bank - Sample Questions
  * Putonghua Shuiping Ceshi (普通话水平测试)
+ *
+ * Official PSC Structure:
+ * - Section 1: 讀單音節字詞 (100 chars, 3.5 min, 10 pts)
+ * - Section 2: 讀多音節詞語 (50 words, 2.5 min, 20 pts)
+ * - Section 3: 選擇判斷 (25 questions, 3 min, 10 pts)
+ *   - 10 詞語判斷 (vocabulary contrast)
+ *   - 10 量詞搭配 (classifier matching)
+ *   - 5 語法判斷 (grammar judgment)
+ * - Section 4: 朗讀短文 (400 chars, 4 min, 30 pts)
+ * - Section 5: 命題說話 (3 min, 30 pts)
  */
 
 export interface Question {
@@ -12,6 +22,10 @@ export interface Question {
   audioUrl?: string;
   options?: string[];
   correctAnswer?: string;
+  // Section 3 specific fields
+  subType?: 'vocab' | 'classifier' | 'grammar';
+  correctMandarin?: string;
+  cantoneseOption?: string;
 }
 
 // Section 1: Single character reading (100 words) - 10%
@@ -244,143 +258,280 @@ export const section2Questions: Question[] = [
   { id: 's2-100', section: 2, type: 'reading', content: '电脑', pinyin: 'diànnǎo' },
 ];
 
-// Section 3: Vocabulary/Grammar choices - 10%
-// Focus: Common confusions for Cantonese speakers
+// Section 3: 選擇判斷 (Choice & Judgment) - 10%
+// PSC Official: 25 questions = 10 詞語判斷 + 10 量詞搭配 + 5 語法判斷
+// Each question tests vocabulary contrast, classifier matching, or grammar judgment
 export const section3Questions: Question[] = [
-  // Direction vocabulary
-  { 
-    id: 's3-1', 
-    section: 3, 
-    type: 'choice', 
-    content: '请问，去图书馆怎么走？',
-    options: ['A. 往前走', 'B. 往左拐', 'C. 往右拐', 'D. 往回走'],
-    correctAnswer: 'A'
+  // =========================================================================
+  // Part 1: 詞語判斷 (Vocabulary Contrast) - 10 questions
+  // Tests: Cantonese vs Mandarin vocabulary
+  // =========================================================================
+  {
+    id: 's3-v1',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '请问，去图书馆______走？',
+    options: ['A. 邊度', 'B. 哪裡', 'C. 邊處', 'D. 邊'],
+    correctAnswer: 'B',
+    correctMandarin: '哪裡',
+    cantoneseOption: '邊度'
   },
-  // Pronouns
-  { 
-    id: 's3-2', 
-    section: 3, 
-    type: 'choice', 
-    content: '今天天气真好，_______去公园玩吧！',
-    options: ['A. 咱们', 'B. 她们', 'C. 它们', 'D. 别人'],
-    correctAnswer: 'A'
+  {
+    id: 's3-v2',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '我們明天去______玩。',
+    options: ['A. 公園', 'B. 公園', 'C. 花園', 'D. 場'],
+    correctAnswer: 'A',
+    correctMandarin: '公園'
   },
-  // Negative
-  { 
-    id: 's3-3', 
-    section: 3, 
-    type: 'choice', 
-    content: '这道题太难了，_______都做不出来。',
-    options: ['A. 谁', 'B. 没人', 'C. 别人', 'D. 大家'],
-    correctAnswer: 'B'
+  {
+    id: 's3-v3',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '這個______多少錢？',
+    options: ['A. 幾多', 'B. 多少', 'C. 幾銀', 'D. 幾錢'],
+    correctAnswer: 'B',
+    correctMandarin: '多少',
+    cantoneseOption: '幾多'
   },
-  // Measure words
-  { 
-    id: 's3-4', 
-    section: 3, 
-    type: 'choice', 
-    content: '我要买_______苹果。',
-    options: ['A. 个', 'B. 条', 'C. 张', 'D. 本'],
-    correctAnswer: 'A'
+  {
+    id: 's3-v4',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '______，請問多少錢？',
+    options: ['A. 伙計', 'B. 服務員', 'C. 姑娘', 'D. 小姐'],
+    correctAnswer: 'B',
+    correctMandarin: '服務員',
+    cantoneseOption: '伙計'
   },
-  // Retroflex vs non-retroflex
-  { 
-    id: 's3-5', 
-    section: 3, 
-    type: 'choice', 
-    content: '_______你在干什么？',
-    options: ['A. 正在', 'B. 正在', 'C. 在', 'D. 正在在'],
-    correctAnswer: 'A'
+  {
+    id: 's3-v5',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '我喜歡聽______。',
+    options: ['A. 歌', 'B. 歌曲', 'C. 歌唱', 'D. 歌謠'],
+    correctAnswer: 'A',
+    correctMandarin: '歌'
   },
-  // Aspect particle
-  { 
-    id: 's3-6', 
-    section: 3, 
-    type: 'choice', 
-    content: '我_______吃饭了。',
-    options: ['A. 已经', 'B. 正在', 'C. 将要', 'D. 常常'],
-    correctAnswer: 'A'
+  {
+    id: 's3-v6',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '昨天夜裡______下了一場大雨。',
+    options: ['A. 咁', 'B. 咁樣', 'C. 這麼', 'D. 噉'],
+    correctAnswer: 'C',
+    correctMandarin: '這麼',
+    cantoneseOption: '咁'
   },
-  // Tone of "不"
-  { 
-    id: 's3-7', 
-    section: 3, 
-    type: 'choice', 
-    content: '我_______去图书馆。',
-    options: ['A. 不去', 'B. 不是去', 'C. 不没去', 'D. 不不去'],
-    correctAnswer: 'A'
+  {
+    id: 's3-v7',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '______是誰告訴你的？',
+    options: ['A. 邊個', 'B. 邊', 'C.邊位', 'D. 誰'],
+    correctAnswer: 'D',
+    correctMandarin: '誰',
+    cantoneseOption: '邊個'
   },
-  // Tone of "一"
-  { 
-    id: 's3-8', 
-    section: 3, 
-    type: 'choice', 
-    content: '我_______告诉你。',
+  {
+    id: 's3-v8',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '你______學校？',
+    options: ['A. 去先', 'B. 先去', 'C. 去先', 'D. 先去'],
+    correctAnswer: 'B',
+    correctMandarin: '先去'
+  },
+  {
+    id: 's3-v9',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '______天氣真好，我們去郊遊吧！',
+    options: ['A. 今日', 'B. 今天', 'C. 今日', 'D. 今'],
+    correctAnswer: 'B',
+    correctMandarin: '今天',
+    cantoneseOption: '今日'
+  },
+  {
+    id: 's3-v10',
+    section: 3,
+    type: 'choice',
+    subType: 'vocab',
+    content: '______已經告訴過你了。',
+    options: ['A. 已前', 'B. 之前', 'C. 之前', 'D. 以前的'],
+    correctAnswer: 'B',
+    correctMandarin: '之前',
+    cantoneseOption: '已前'
+  },
+
+  // =========================================================================
+  // Part 2: 量詞搭配 (Classifier Matching) - 10 questions
+  // Tests: Correct classifier-noun pairing
+  // =========================================================================
+  {
+    id: 's3-c1',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '我要買______蘋果。',
+    options: ['A. 個', 'B. 條', 'C. 張', 'D. 本'],
+    correctAnswer: 'A',
+    correctMandarin: '個'
+  },
+  {
+    id: 's3-c2',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '他有一______汽車。',
+    options: ['A. 架', 'B. 輛', 'C. 臺', 'D. 張'],
+    correctAnswer: 'B',
+    correctMandarin: '輛'
+  },
+  {
+    id: 's3-c3',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '那是______飛機。',
+    options: ['A. 架', 'B. 輛', 'C. 艘', 'D. 匹'],
+    correctAnswer: 'A',
+    correctMandarin: '架'
+  },
+  {
+    id: 's3-c4',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '桌子上放著______書。',
+    options: ['A. 本', 'B. 張', 'C. 個', 'D. 支'],
+    correctAnswer: 'A',
+    correctMandarin: '本'
+  },
+  {
+    id: 's3-c5',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '河裡有______魚。',
+    options: ['A. 隻', 'B. 條', 'C. 尾', 'D. 頭'],
+    correctAnswer: 'B',
+    correctMandarin: '條'
+  },
+  {
+    id: 's3-c6',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '他養了______狗。',
+    options: ['A. 頭', 'B. 隻', 'C. 條', 'D. 匹'],
+    correctAnswer: 'B',
+    correctMandarin: '隻'
+  },
+  {
+    id: 's3-c7',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '請給我______鉛筆。',
+    options: ['A. 枝', 'B. 支', 'C. 桿', 'D. 筒'],
+    correctAnswer: 'B',
+    correctMandarin: '支'
+  },
+  {
+    id: 's3-c8',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '我們家有______人。',
+    options: ['A. 個', 'B. 口', 'C. 位', 'D. 名'],
+    correctAnswer: 'B',
+    correctMandarin: '口'
+  },
+  {
+    id: 's3-c9',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '他是一位______。',
+    options: ['A. 名', 'B. 個', 'C. 位', 'D. 種'],
+    correctAnswer: 'C',
+    correctMandarin: '位'
+  },
+  {
+    id: 's3-c10',
+    section: 3,
+    type: 'choice',
+    subType: 'classifier',
+    content: '這是______好辦法。',
+    options: ['A. 種', 'B. 類', 'C. 樣', 'D. 項'],
+    correctAnswer: 'A',
+    correctMandarin: '種'
+  },
+
+  // =========================================================================
+  // Part 3: 語法判斷 (Grammar Judgment) - 5 questions
+  // Tests: Grammar structure and word order
+  // =========================================================================
+  {
+    id: 's3-g1',
+    section: 3,
+    type: 'choice',
+    subType: 'grammar',
+    content: '我______吃飯了。',
+    options: ['A. 已經', 'B. 正在', 'C. 將要', 'D. 常常'],
+    correctAnswer: 'A',
+    correctMandarin: '已經'
+  },
+  {
+    id: 's3-g2',
+    section: 3,
+    type: 'choice',
+    subType: 'grammar',
+    content: '這件事______很重要。',
+    options: ['A. 非常', 'B. 經常', 'C. 常常', 'D. 一直'],
+    correctAnswer: 'A',
+    correctMandarin: '非常'
+  },
+  {
+    id: 's3-g3',
+    section: 3,
+    type: 'choice',
+    subType: 'grammar',
+    content: '他是學生，______是老師？',
+    options: ['A. 那麼', 'B. 還是', 'C. 是不是', 'D. 非常'],
+    correctAnswer: 'B',
+    correctMandarin: '還是'
+  },
+  {
+    id: 's3-g4',
+    section: 3,
+    type: 'choice',
+    subType: 'grammar',
+    content: '我______告訴你。',
     options: ['A. 一', 'B. 就要', 'C. 一定', 'D. 一起'],
-    correctAnswer: 'C'
+    correctAnswer: 'C',
+    correctMandarin: '一定'
   },
-  // Common patterns
-  { 
-    id: 's3-9', 
-    section: 3, 
-    type: 'choice', 
-    content: '这件事_______很重要。',
-    options: ['A. 非常', 'B. 经常', 'C. 常常', 'D. 一直'],
-    correctAnswer: 'A'
-  },
-  // Modal verbs
-  { 
-    id: 's3-10', 
-    section: 3, 
-    type: 'choice', 
-    content: '你_______说普通话吗？',
-    options: ['A. 会', 'B. 能', 'C. 可以', 'D. 要'],
-    correctAnswer: 'A'
-  },
-  // n/l distinction
-  { 
-    id: 's3-11', 
-    section: 3, 
-    type: 'choice', 
-    content: '_______是一个很漂亮的城市。',
-    options: ['A. 兰洲', 'B. 兰州', 'C. 南州', 'D. 南舟'],
-    correctAnswer: 'B'
-  },
-  // erhua (儿化)
-  { 
-    id: 's3-12', 
-    section: 3, 
-    type: 'choice', 
-    content: '这个小孩很_______。',
-    options: ['A. 可爱', 'B. 可爱儿', 'C. 可爱里', 'D. 可爱咯'],
-    correctAnswer: 'A'
-  },
-  // Word order
-  { 
-    id: 's3-13', 
-    section: 3, 
-    type: 'choice', 
-    content: '_______今天来学校？',
-    options: ['A. 谁', 'B. 什么', 'C. 哪', 'D. 怎么'],
-    correctAnswer: 'A'
-  },
-  // Vocabulary
-  { 
-    id: 's3-14', 
-    section: 3, 
-    type: 'choice', 
-    content: '我喜欢_______音乐。',
-    options: ['A. 听', 'B. 听说', 'C. 听到', 'D. 听力'],
-    correctAnswer: 'A'
-  },
-  // Grammar
-  { 
-    id: 's3-15', 
-    section: 3, 
-    type: 'choice', 
-    content: '他是学生，_______是老师？',
-    options: ['A. 那么', 'B. 还是', 'C. 是不是', 'D. 非常'],
-    correctAnswer: 'B'
+  {
+    id: 's3-g5',
+    section: 3,
+    type: 'choice',
+    subType: 'grammar',
+    content: '你______說普通話嗎？',
+    options: ['A. 會', 'B. 能', 'C. 可以', 'D. 要'],
+    correctAnswer: 'A',
+    correctMandarin: '會'
   },
 ];
 

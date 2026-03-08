@@ -4,8 +4,8 @@ import Header from "./Header";
 import AudioRecorder from "./AudioRecorder";
 import FloatingChatButton from "./FloatingChatButton";
 import { COLORS, ROUTES } from "../constants";
-import { savePracticeRecord, TestRecord } from "../services/testHistory";
-import { tailoredPracticeService, GeneratedQuestion } from "../services/api";
+import { savePracticeRecord, updatePracticeRecord, TestRecord, PracticeQuestion, PracticeRecord } from "../services/testHistory";
+import { tailoredPracticeService, GeneratedQuestion, audioService } from "../services/api";
 
 interface LocationState {
   fromHistory?: boolean;
@@ -13,6 +13,27 @@ interface LocationState {
   weaknesses?: string[];
   strengths?: string[];
   testRecordId?: string;
+  fromPracticeHistory?: boolean;
+  practiceRecord?: PracticeRecord;
+  focusAreas?: string[];
+  practiceType?: string;
+}
+
+interface AnalysisResult {
+  success: boolean;
+  scores?: {
+    overall: number;
+    pronunciation: number;
+    tone: number;
+    fluency: number;
+  };
+  feedback?: {
+    overall_assessment_en: string;
+    overall_assessment_zh: string;
+    key_issues?: string[];
+    detailed_analysis?: string;
+    improvement_tips?: string[];
+  };
 }
 
 type PracticeMode = 'input' | 'generating' | 'practice' | 'complete';
@@ -65,7 +86,14 @@ const TailoredPractice: React.FC = () => {
   const [practiceScore, setPracticeScore] = useState(0);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [fromHistoryRecord, setFromHistoryRecord] = useState<TestRecord | null>(null);
+  const [fromPracticeHistoryRecord, setFromPracticeHistoryRecord] = useState<PracticeRecord | null>(null);
   const [practiceType, setPracticeType] = useState<string>('custom');
+  const [practiceRecordId, setPracticeRecordId] = useState<string | null>(null);
+
+  // Audio analysis state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [questionScores, setQuestionScores] = useState<{ score: number; feedbackEn: string; feedbackZh: string }[]>([]);
 
   useEffect(() => {
     if (state?.fromHistory && state.testRecord) {
@@ -73,6 +101,13 @@ const TailoredPractice: React.FC = () => {
       setUserInput(state.testRecord.feedbackEn || '');
       const weaknessCategories = mapWeaknessesToCategories(state.weaknesses || []);
       setSelectedCategories(weaknessCategories);
+    } else if (state?.fromPracticeHistory && state.focusAreas) {
+      // Handle practice from practice history - use the same focus areas
+      setFromPracticeHistoryRecord(state.practiceRecord || null);
+      setSelectedCategories(state.focusAreas);
+      if (state.practiceType) {
+        setPracticeType(`${state.practiceType.charAt(0).toUpperCase() + state.practiceType.slice(1)} Practice`);
+      }
     }
   }, [state]);
 
@@ -112,7 +147,7 @@ const TailoredPractice: React.FC = () => {
         selectedCategories
       });
 
-      let result;
+      let result: { success: boolean; questions?: GeneratedQuestion[]; error?: string } | undefined;
       if (fromHistoryRecord) {
         result = await tailoredPracticeService.generatePractice({
           historyRecord: {
@@ -160,39 +195,121 @@ const TailoredPractice: React.FC = () => {
     setPracticeScore(0);
     setQuestionsAnswered(0);
     setRecordedAudio(null);
+    setIsAnalyzing(false);
+    setAnalysisResult(null);
+    setQuestionScores([]);
     setMode('practice');
   };
 
-  const handleRecordingComplete = (blob: Blob, duration: number) => {
+  const handleRecordingComplete = async (blob: Blob, duration: number) => {
     setRecordedAudio({ blob, duration });
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+
+    try {
+      // Upload audio to S3
+      const uploadResult = await audioService.uploadAudio(blob, `practice-${Date.now()}.webm`);
+      if (!uploadResult.success || !uploadResult.url) {
+        setIsAnalyzing(false);
+        return;
+      }
+
+      const currentQuestion = generatedQuestions[currentQuestionIndex];
+      const expectedText = currentQuestion?.content || '';
+
+      // Analyze audio
+      const analyzeResponse = await fetch('http://localhost:3001/api/audio/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioUrl: uploadResult.url, expectedText, section: 'practice' }),
+      });
+      const result = await analyzeResponse.json();
+      setAnalysisResult(result);
+
+      if (result.success && result.scores) {
+        // Store the real score
+        const realScore = result.scores.overall || 0;
+        setQuestionScores(prev => [...prev, {
+          score: realScore,
+          feedbackEn: result.feedback?.overall_assessment_en || '',
+          feedbackZh: result.feedback?.overall_assessment_zh || ''
+        }]);
+      }
+    } catch (error) {
+      console.error('Error analyzing audio:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleReRecord = () => {
+    setRecordedAudio(null);
+    setAnalysisResult(null);
   };
 
   const handleNextQuestion = async () => {
-    const questionScore = Math.random() * 20 + 80;
-    setPracticeScore(prev => prev + questionScore);
-    setQuestionsAnswered(prev => prev + 1);
+    // Use real score if available, otherwise fallback to a default
+    const currentQuestionScore = questionScores[questionScores.length - 1]?.score || 75;
+    const newScore = practiceScore + currentQuestionScore;
+    const newQuestionsAnswered = questionsAnswered + 1;
+
+    setPracticeScore(newScore);
+    setQuestionsAnswered(newQuestionsAnswered);
+
+    // Save or update practice record after each question
+    try {
+      if (!practiceRecordId) {
+        // First question - create the record with questions and practice type
+        const practiceTypeMap: Record<string, 'tone' | 'pronunciation' | 'vocabulary' | 'fluency' | 'mixed'> = {
+          'tone_1': 'tone', 'tone_2': 'tone', 'tone_3': 'tone', 'tone_4': 'tone',
+          'third_tone': 'tone', 'neutral_tone': 'tone'
+        };
+
+        // Determine practice type from categories
+        let determinedPracticeType: 'tone' | 'pronunciation' | 'vocabulary' | 'fluency' | 'mixed' = 'mixed';
+        if (selectedCategories.length > 0) {
+          const firstCat = selectedCategories[0];
+          if (practiceTypeMap[firstCat]) {
+            determinedPracticeType = practiceTypeMap[firstCat];
+          } else if (firstCat.includes('retroflex') || firstCat.includes('nasal') || firstCat.includes('n_vs_l') || firstCat.includes('f_vs_h') || firstCat.includes('u_vs_ü') || firstCat.includes('zcs')) {
+            determinedPracticeType = 'pronunciation';
+          } else if (firstCat.includes('classifier') || firstCat.includes('ba') || firstCat.includes('le_structure')) {
+            determinedPracticeType = 'vocabulary';
+          }
+        }
+
+        const recordId = await savePracticeRecord({
+          userId: '',
+          practiceDate: new Date(),
+          practiceType: determinedPracticeType,
+          focusAreas: selectedCategories.length > 0 ? selectedCategories : ['General'],
+          score: Math.round(newScore / newQuestionsAnswered),
+          duration: newQuestionsAnswered * 30,
+          questionsAttempted: newQuestionsAnswered,
+          correctAnswers: Math.round((newScore / newQuestionsAnswered) * newQuestionsAnswered / 100),
+          questions: generatedQuestions as PracticeQuestion[]
+        });
+        setPracticeRecordId(recordId);
+      } else {
+        // Subsequent questions - update the record
+        const currentScore = Math.round(newScore / newQuestionsAnswered);
+        await updatePracticeRecord(practiceRecordId, {
+          score: currentScore,
+          duration: newQuestionsAnswered * 30,
+          questionsAttempted: newQuestionsAnswered,
+          correctAnswers: Math.round(currentScore * newQuestionsAnswered / 100)
+        });
+      }
+    } catch (error) {
+      console.error('Error saving practice progress:', error);
+    }
 
     if (currentQuestionIndex < generatedQuestions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
       setRecordedAudio(null);
+      setAnalysisResult(null);
     } else {
       setMode('complete');
-
-      const finalScore = Math.round(practiceScore / questionsAnswered);
-      try {
-        await savePracticeRecord({
-          userId: '',
-          practiceDate: new Date(),
-          practiceType: 'mixed',
-          focusAreas: selectedCategories.length > 0 ? selectedCategories : ['General'],
-          score: finalScore,
-          duration: questionsAnswered * 30,
-          questionsAttempted: questionsAnswered,
-          correctAnswers: Math.round(finalScore * questionsAnswered / 100)
-        });
-      } catch (error) {
-        console.error('Error saving practice:', error);
-      }
     }
   };
 
@@ -206,6 +323,11 @@ const TailoredPractice: React.FC = () => {
     setPracticeScore(0);
     setQuestionsAnswered(0);
     setFromHistoryRecord(null);
+    setFromPracticeHistoryRecord(null);
+    setPracticeRecordId(null);
+    setIsAnalyzing(false);
+    setAnalysisResult(null);
+    setQuestionScores([]);
   };
 
   const getScoreColor = (score: number) => {
@@ -216,7 +338,10 @@ const TailoredPractice: React.FC = () => {
   };
 
   if (mode === 'complete') {
-    const finalScore = Math.round(practiceScore / questionsAnswered);
+    // Use real scores from questionScores if available, otherwise fallback to calculated score
+    const finalScore = questionScores.length > 0
+      ? Math.round(questionScores.reduce((sum, q) => sum + q.score, 0) / questionScores.length)
+      : Math.round(practiceScore / questionsAnswered);
 
     return (
       <div style={{ minHeight: "100vh", backgroundColor: COLORS.light }}>
@@ -231,6 +356,20 @@ const TailoredPractice: React.FC = () => {
             <p style={{ color: COLORS.muted, marginBottom: "24px" }}>
               You completed {questionsAnswered} questions in this session
             </p>
+
+            {/* Show summary of all question scores if available */}
+            {questionScores.length > 0 && (
+              <div style={{ textAlign: "left", marginBottom: "24px", backgroundColor: "#f8f9fa", padding: "16px", borderRadius: "8px" }}>
+                <div style={{ fontWeight: "600", color: COLORS.primary, marginBottom: "12px" }}>Question Summary</div>
+                {questionScores.map((q, idx) => (
+                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: idx < questionScores.length - 1 ? "1px solid #eee" : "none" }}>
+                    <span style={{ fontSize: "14px", color: "#555" }}>Q{idx + 1}</span>
+                    <span style={{ fontSize: "14px", fontWeight: "600", color: getScoreColor(q.score) }}>{q.score}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <p style={{ fontSize: "14px", color: COLORS.muted, marginBottom: "32px", backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "8px" }}>
               Focus: {practiceType}
             </p>
@@ -307,16 +446,78 @@ const TailoredPractice: React.FC = () => {
             </div>
           ) : (
             <div style={{ textAlign: "center" }}>
-              <div style={{ padding: "16px", backgroundColor: "#e8f5e9", borderRadius: "8px", marginBottom: "16px", display: "inline-block" }}>
-                <span style={{ color: "#2e7d32", fontWeight: "600" }}>✓ Recording captured!</span>
-              </div>
-              <br />
-              <button
-                onClick={handleNextQuestion}
-                style={{ padding: "14px 32px", fontSize: "16px", fontWeight: "600", backgroundColor: COLORS.primary, color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}
-              >
-                {currentQuestionIndex < generatedQuestions.length - 1 ? "Next Question →" : "Complete Practice"}
-              </button>
+              {isAnalyzing ? (
+                <div style={{ padding: "32px", backgroundColor: "#fff3e0", borderRadius: "12px", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "32px", marginBottom: "12px" }}>🔄</div>
+                  <div style={{ color: "#e65100", fontWeight: "600", marginBottom: "8px" }}>Analyzing your pronunciation...</div>
+                  <div style={{ fontSize: "14px", color: "#666" }}>This may take a few seconds</div>
+                </div>
+              ) : analysisResult?.success && analysisResult.scores ? (
+                <div style={{ textAlign: "left", maxWidth: "500px", margin: "0 auto" }}>
+                  {/* Score Display */}
+                  <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "20px", marginBottom: "16px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", border: `2px solid ${getScoreColor(analysisResult.scores.overall)}` }}>
+                    <div style={{ textAlign: "center", marginBottom: "16px" }}>
+                      <div style={{ fontSize: "14px", color: COLORS.muted, marginBottom: "4px" }}>Your Score</div>
+                      <div style={{ fontSize: "48px", fontWeight: "bold", color: getScoreColor(analysisResult.scores.overall) }}>
+                        {analysisResult.scores.overall}%
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-around", borderTop: "1px solid #eee", paddingTop: "16px" }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "12px", color: COLORS.muted }}>Pronunciation</div>
+                        <div style={{ fontSize: "18px", fontWeight: "600", color: getScoreColor(analysisResult.scores.pronunciation) }}>{analysisResult.scores.pronunciation}%</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "12px", color: COLORS.muted }}>Tone</div>
+                        <div style={{ fontSize: "18px", fontWeight: "600", color: getScoreColor(analysisResult.scores.tone) }}>{analysisResult.scores.tone}%</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "12px", color: COLORS.muted }}>Fluency</div>
+                        <div style={{ fontSize: "18px", fontWeight: "600", color: getScoreColor(analysisResult.scores.fluency) }}>{analysisResult.scores.fluency}%</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Feedback */}
+                  {analysisResult.feedback && (
+                    <div style={{ backgroundColor: "#e3f2fd", borderRadius: "12px", padding: "16px", marginBottom: "16px" }}>
+                      <div style={{ fontWeight: "600", color: COLORS.primary, marginBottom: "12px" }}>Feedback / 反馈</div>
+                      {analysisResult.feedback.overall_assessment_en && (
+                        <div style={{ fontSize: "14px", color: "#1565c0", marginBottom: "8px", whiteSpace: "pre-wrap" }}>{analysisResult.feedback.overall_assessment_en}</div>
+                      )}
+                      {analysisResult.feedback.overall_assessment_zh && (
+                        <div style={{ fontSize: "14px", color: "#1565c0", whiteSpace: "pre-wrap" }}>{analysisResult.feedback.overall_assessment_zh}</div>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleReRecord}
+                    style={{ padding: "10px 20px", fontSize: "14px", fontWeight: "600", backgroundColor: "white", color: COLORS.primary, border: `2px solid ${COLORS.primary}`, borderRadius: "8px", cursor: "pointer", marginRight: "12px" }}
+                  >
+                    🔄 Re-record
+                  </button>
+                  <button
+                    onClick={handleNextQuestion}
+                    style={{ padding: "14px 32px", fontSize: "16px", fontWeight: "600", backgroundColor: COLORS.primary, color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}
+                  >
+                    {currentQuestionIndex < generatedQuestions.length - 1 ? "Next Question →" : "Complete Practice"}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ padding: "16px", backgroundColor: "#e8f5e9", borderRadius: "8px", marginBottom: "16px", display: "inline-block" }}>
+                    <span style={{ color: "#2e7d32", fontWeight: "600" }}>✓ Recording captured!</span>
+                  </div>
+                  <br />
+                  <button
+                    onClick={handleNextQuestion}
+                    style={{ padding: "14px 32px", fontSize: "16px", fontWeight: "600", backgroundColor: COLORS.primary, color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}
+                  >
+                    {currentQuestionIndex < generatedQuestions.length - 1 ? "Next Question →" : "Complete Practice"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </main>

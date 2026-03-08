@@ -11,22 +11,28 @@ import { saveTestRecord, analyzeStrengthsWeaknesses, TestSectionScore } from "..
 import { useCharacter } from "../context/CharacterContext";
 import { auth } from "../lib/firebase";
 
-// PSC Section Time Limits (in seconds)
+// PSC Section Time Limits (official PSC timing)
+// Section 1: 3.5 min (210s) - 100 single characters
+// Section 2: 2.5 min (150s) - 50 polysyllabic words
+// Section 3: 3 min (180s) - 25 choice questions
+// Section 4: 4 min (240s) - 400-character passage
+// Section 5: 3 min (180s) - topic speaking
 const SECTION_TIME_LIMITS: Record<number, number> = {
-  1: 180,  // 3 minutes
-  2: 180,  // 3 minutes
-  3: 300,  // 5 minutes
+  1: 210,  // 3.5 minutes
+  2: 150,  // 2.5 minutes
+  3: 180,  // 3 minutes
   4: 240,  // 4 minutes
   5: 180,  // 3 minutes
 };
 
 // PSC Section Info (fallback when API not used)
+// Official PSC structure: 100+100+25+1+2 questions, weights 10%+20%+10%+30%+30%=100%
 const SECTIONS = [
-  { id: 1, title: "Section 1: Single Characters", description: "100 characters - test basic syllables", timeLimit: "3 min", scoreWeight: "10%", icon: "📝" },
-  { id: 2, title: "Section 2: Polysyllabic Words", description: "100 words - focus on tones", timeLimit: "3 min", scoreWeight: "20%", icon: "📖" },
-  { id: 3, title: "Section 3: Vocabulary & Grammar", description: "Word judgment, classifiers, grammar", timeLimit: "5 min", scoreWeight: "10%", icon: "❓" },
-  { id: 4, title: "Section 4: Reading Passage", description: "Read 400-character passage", timeLimit: "4 min", scoreWeight: "30%", icon: "📄" },
-  { id: 5, title: "Section 5: Speaking Topic", description: "3-minute speech on topic", timeLimit: "3 min", scoreWeight: "30%", icon: "🎤" },
+  { id: 1, title: "Section 1: 讀單音節字詞", description: "100 single characters - test basic syllables", timeLimit: "3.5 min", scoreWeight: "10%", icon: "📝" },
+  { id: 2, title: "Section 2: 讀多音節詞語", description: "50 words - focus on tones, tone sandhi, neutral tone", timeLimit: "2.5 min", scoreWeight: "20%", icon: "📖" },
+  { id: 3, title: "Section 3: 選擇判斷", description: "25 questions: vocabulary contrast, classifiers, grammar", timeLimit: "3 min", scoreWeight: "10%", icon: "❓" },
+  { id: 4, title: "Section 4: 朗讀短文", description: "Read 400-character passage", timeLimit: "4 min", scoreWeight: "30%", icon: "📄" },
+  { id: 5, title: "Section 5: 命題說話", description: "3-minute speech on topic", timeLimit: "3 min", scoreWeight: "30%", icon: "🎤" },
 ];
 
 // GET /api/test/sections response (backend)
@@ -699,8 +705,6 @@ const QuestionPage: React.FC<{
       } catch (_) {
         // Firebase not ready or no ID token; continue without auth so analyze still runs
       }
-      const fallbackToken = localStorage.getItem('token');
-      if (!headers['Authorization'] && fallbackToken) headers['Authorization'] = `Bearer ${fallbackToken}`;
 
       const origin = API_BASE_URL.replace(/\/api\/?$/, '') || '';
       const analyzeUrl = origin ? `${origin}/api/audio/analyze` : '/api/audio/analyze';
@@ -791,27 +795,27 @@ const QuestionPage: React.FC<{
         const feedbackEn = feedback?.overall_assessment_en ?? '';
         const feedbackZh = feedback?.overall_assessment_zh ?? '';
 
-        if (auth.currentUser) {
-          try {
-            await saveTestRecord({
-              userId: '', // Set by service from auth.currentUser
-              testDate: new Date(),
-              overallScore: overall,
-              level: scoreData.level,
-              grade: scoreData.grade,
-              sectionScores,
-              strengths,
-              weaknesses,
-              feedbackEn,
-              feedbackZh,
-              totalQuestions: questions.length,
-              correctAnswers: Math.round(overall * questions.length / 100),
-              testType: 'section',
-              sectionId: section
-            });
-          } catch (e) {
-            console.error('Failed to save test record to history:', e);
-          }
+        // Save to history (only if user is logged in)
+        try {
+          await saveTestRecord({
+            userId: '', // Will be set by the service
+            testDate: new Date(),
+            overallScore: overall,
+            level: scoreData.level,
+            grade: scoreData.grade,
+            sectionScores,
+            strengths,
+            weaknesses,
+            feedbackEn,
+            feedbackZh,
+            totalQuestions: questions.length,
+            correctAnswers: Math.round(overall * questions.length / 100),
+            testType: 'section',
+            sectionId: section
+          });
+        } catch (saveError) {
+          // Silently ignore if user not logged in
+          console.log('Test record not saved (user not logged in)');
         }
       }
     } catch (error) { console.error('Error:', error); }
@@ -947,11 +951,25 @@ const QuestionPage: React.FC<{
 
         {analysisResult && (
           <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "32px", marginTop: "24px" }}>
-            <h3 style={{ margin: "0 0 24px 0", color: COLORS.primary, textAlign: "center" }}>Analysis Results</h3>
+            <h3 style={{ margin: "0 0 24px 0", color: COLORS.primary, textAlign: "center" }}>
+              {section === 3 ? "選擇判斷 Results / 選擇判斷結果" : "Analysis Results"}
+            </h3>
             {(analysisResult.success && analysisResult.code !== 'audio_cannot_be_processed') ? (
               <>
+                {/* Section 3 specific info */}
+                {section === 3 && (
+                  <div style={{ marginBottom: "20px", padding: "16px", backgroundColor: "#e8f5e9", borderRadius: "12px" }}>
+                    <div style={{ fontSize: "14px", fontWeight: "600", color: "#2e7d32", marginBottom: "8px" }}>選擇判斷說明 / Section 3 Info:</div>
+                    <div style={{ fontSize: "13px", color: "#555" }}>
+                      25 questions: 10 詞語判斷 (vocabulary) + 10 量詞搭配 (classifiers) + 5 語法判斷 (grammar)
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ textAlign: "center", padding: "24px", backgroundColor: "#f8f9fa", borderRadius: "12px", marginBottom: "24px" }}>
-                  <div style={{ fontSize: "14px", color: COLORS.muted }}>PSC Score</div>
+                  <div style={{ fontSize: "14px", color: COLORS.muted }}>
+                    {section === 3 ? "選擇判斷得分" : section === 5 ? "命題說話得分" : "PSC Score"}
+                  </div>
                   <div style={{ fontSize: "64px", fontWeight: "bold", color: getScoreColor(analysisResult.scores?.overall || 0) }}>{Math.round(analysisResult.scores?.overall || 0)}%</div>
                   <div style={{ display: "inline-block", padding: "8px 16px", backgroundColor: analysisResult.scores?.pass ? "#e8f5e9" : "#ffebee", borderRadius: "20px", color: analysisResult.scores?.pass ? "#2e7d32" : "#c62828", fontWeight: "600" }}>
                     {calculatePSCScore(analysisResult.scores?.overall || 0).level} - {calculatePSCScore(analysisResult.scores?.overall || 0).grade}
@@ -999,7 +1017,128 @@ const QuestionPage: React.FC<{
                     </div>
                   </div>
                 )}
-                {analysisResult.feedback && <div><h4 style={{ margin: "0 0 12px 0", color: COLORS.primary }}>Feedback / 反馈</h4><div style={{ padding: "16px", backgroundColor: "#e3f2fd", borderRadius: "8px", whiteSpace: "pre-wrap", fontSize: "14px", color: "#1565c0" }}>{analysisResult.feedback}</div></div>}
+                {analysisResult.feedback && (
+                  <div style={{ marginTop: '16px' }}>
+                    {/* Overall Assessment */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <h4 style={{ margin: "0 0 12px 0", color: COLORS.primary }}>Feedback / 反馈</h4>
+                      {(analysisResult.feedback as { overall_assessment_en?: string }).overall_assessment_en && (
+                        <div style={{ padding: "12px", backgroundColor: "#e3f2fd", borderRadius: "8px", marginBottom: '8px' }}>
+                          <p style={{ margin: "0 0 8px 0", fontSize: "14px", color: "#1565c0", fontWeight: '600' }}>{(analysisResult.feedback as { overall_assessment_en?: string }).overall_assessment_en}</p>
+                          <p style={{ margin: 0, fontSize: "13px", color: "#0d47a1" }}>{(analysisResult.feedback as { overall_assessment_zh?: string }).overall_assessment_zh}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Simple feedback string fallback - handle both string and object */}
+                    {typeof analysisResult.feedback === 'string' && (
+                      <div style={{ padding: "16px", backgroundColor: "#e3f2fd", borderRadius: "8px", whiteSpace: "pre-wrap", fontSize: "14px", color: "#1565c0", marginBottom: '16px' }}>{analysisResult.feedback}</div>
+                    )}
+
+                    {/* Character Analysis - Tone, Consonant, Vowel Details */}
+                    {(analysisResult.feedback as { character_analysis?: Array<{ character: string; expected_tone?: number; actual_tone?: number; expected_initial?: string; actual_initial?: string; expected_final?: string; actual_final?: string; status?: string; error_type?: string; feedback_en?: string; feedback_zh?: string; fix_tip_en?: string; fix_tip_zh?: string; practice_words?: string[] }> }).character_analysis && (analysisResult.feedback as { character_analysis: Array<{ character: string }> }).character_analysis.length > 0 && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <h4 style={{ margin: "0 0 12px 0", color: COLORS.primary }}>Detailed Analysis / 详细分析 (Tone, Consonant, Vowel)</h4>
+                        <p style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>声调 Tones | 声母 Initials (Consonants) | 韵母 Finals (Vowels)</p>
+                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                          {(analysisResult.feedback as { character_analysis: Array<{ character: string; expected_tone?: number; actual_tone?: number; expected_initial?: string; actual_initial?: string; expected_final?: string; actual_final?: string; status?: string; error_type?: string; feedback_en?: string; feedback_zh?: string; fix_tip_en?: string; fix_tip_zh?: string; practice_words?: string[] }> }).character_analysis.slice(0, 15).map((char, idx) => (
+                            <div key={idx} style={{
+                              padding: '12px',
+                              marginBottom: '8px',
+                              backgroundColor: char.status === 'correct' ? '#f0fdf4' : char.status === 'review' ? '#fff7ed' : '#fef2f2',
+                              borderRadius: '8px',
+                              border: `1px solid ${char.status === 'correct' ? '#bbf7d0' : char.status === 'review' ? '#fed7aa' : '#fecaca'}`
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '20px', fontWeight: 'bold' }}>{char.character}</span>
+                                <span style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: '600',
+                                  backgroundColor: char.status === 'correct' ? '#22c55e' : char.status === 'review' ? '#f97316' : '#ef4444',
+                                  color: 'white'
+                                }}>
+                                  {char.status?.toUpperCase()}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>
+                                <div><strong>期望 Expected:</strong> Tone {char.expected_tone} | Initial {char.expected_initial || '-'} | Final {char.expected_final || '-'}</div>
+                                <div><strong>实际 Actual:</strong> Tone {char.actual_tone} | Initial {char.actual_initial || '-'} | Final {char.actual_final || '-'}</div>
+                              </div>
+                              {char.error_type && char.error_type !== 'none' && (
+                                <div style={{ fontSize: '11px', color: '#991b1b', marginBottom: '4px' }}>
+                                  Error Type / 错误类型: {char.error_type}
+                                </div>
+                              )}
+                              {(char.feedback_en || char.feedback_zh) && (
+                                <div style={{ fontSize: '12px', marginTop: '6px', padding: '8px', backgroundColor: 'white', borderRadius: '4px' }}>
+                                  <div style={{ fontWeight: '600', color: '#7c3aed' }}>{char.feedback_zh || char.feedback_en}</div>
+                                  <div style={{ color: '#666', marginTop: '4px' }}>{char.feedback_en}</div>
+                                </div>
+                              )}
+                              {char.fix_tip_en && (
+                                <div style={{ fontSize: '11px', color: '#059669', marginTop: '6px', padding: '6px', backgroundColor: '#ecfdf5', borderRadius: '4px' }}>
+                                  Fix / 改正: {char.fix_tip_zh || char.fix_tip_en}
+                                </div>
+                              )}
+                              {char.practice_words && char.practice_words.length > 0 && (
+                                <div style={{ marginTop: '8px' }}>
+                                  {char.practice_words.map((word, wi) => (
+                                    <span key={wi} style={{ display: 'inline-block', marginRight: '4px', marginBottom: '4px', padding: '2px 8px', backgroundColor: '#3b82f6', color: 'white', borderRadius: '4px', fontSize: '11px' }}>{word}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tone Analysis Summary */}
+                    {(analysisResult.feedback as { tone_analysis?: { total_tones?: number; correct_tones?: number; tone_accuracy?: string; common_errors?: string[] } }).tone_analysis && (
+                      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f0f9ff', borderRadius: '8px' }}>
+                        <h4 style={{ margin: "0 0 12px 0", color: '#0369a1' }}>Tone Analysis / 声调分析</h4>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '14px' }}>
+                          <div>Total / 总数: <strong>{(analysisResult.feedback as { tone_analysis: { total_tones: number } }).tone_analysis.total_tones}</strong></div>
+                          <div>Correct / 正确: <strong style={{ color: '#22c55e' }}>{(analysisResult.feedback as { tone_analysis: { correct_tones: number } }).tone_analysis.correct_tones}</strong></div>
+                          <div>Accuracy / 准确率: <strong>{(analysisResult.feedback as { tone_analysis: { tone_accuracy: string } }).tone_analysis.tone_accuracy}</strong></div>
+                        </div>
+                        {(analysisResult.feedback as { tone_analysis: { common_errors: string[] } }).tone_analysis.common_errors && (analysisResult.feedback as { tone_analysis: { common_errors: string[] } }).tone_analysis.common_errors.length > 0 && (
+                          <div style={{ marginTop: '8px', fontSize: '12px' }}>
+                            <span style={{ fontWeight: '600', color: '#666' }}>Common Errors / 常见错误: </span>
+                            {(analysisResult.feedback as { tone_analysis: { common_errors: string[] } }).tone_analysis.common_errors.map((err, i) => (
+                              <span key={i} style={{ display: 'inline-block', marginLeft: '4px', padding: '2px 6px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '4px', fontSize: '11px' }}>{err}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Phoneme Analysis Summary */}
+                    {(analysisResult.feedback as { phoneme_analysis?: { consonant_issues?: string[]; vowel_issues?: string[] } }).phoneme_analysis && (
+                      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#faf5ff', borderRadius: '8px' }}>
+                        <h4 style={{ margin: "0 0 12px 0", color: '#7c3aed' }}>Phoneme Analysis / 音素分析</h4>
+                        {(analysisResult.feedback as { phoneme_analysis: { consonant_issues: string[] } }).phoneme_analysis.consonant_issues && (analysisResult.feedback as { phoneme_analysis: { consonant_issues: string[] } }).phoneme_analysis.consonant_issues.length > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '4px' }}>Consonant / Initial Issues (声母问题):</div>
+                            {(analysisResult.feedback as { phoneme_analysis: { consonant_issues: string[] } }).phoneme_analysis.consonant_issues.map((issue, i) => (
+                              <span key={i} style={{ display: 'inline-block', marginRight: '4px', marginBottom: '4px', padding: '2px 8px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '4px', fontSize: '11px' }}>{issue}</span>
+                            ))}
+                          </div>
+                        )}
+                        {(analysisResult.feedback as { phoneme_analysis: { vowel_issues: string[] } }).phoneme_analysis.vowel_issues && (analysisResult.feedback as { phoneme_analysis: { vowel_issues: string[] } }).phoneme_analysis.vowel_issues.length > 0 && (
+                          <div>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '4px' }}>Vowel / Final Issues (韵母问题):</div>
+                            {(analysisResult.feedback as { phoneme_analysis: { vowel_issues: string[] } }).phoneme_analysis.vowel_issues.map((issue, i) => (
+                              <span key={i} style={{ display: 'inline-block', marginRight: '4px', marginBottom: '4px', padding: '2px 8px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '4px', fontSize: '11px' }}>{issue}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <div style={{ padding: "16px", backgroundColor: "#ffebee", borderRadius: "8px" }}>
@@ -1028,10 +1167,41 @@ const MockTest: React.FC = () => {
   const [fullTestSectionResults, setFullTestSectionResults] = useState<Record<number, FullTestSectionResult>>({});
   const [testSessionId, setTestSessionId] = useState<string | null>(null);
 
+  // Audio analysis test state
+  const [testView, setTestView] = useState<'select' | 'question' | 'result' | null>(null);
+  const [testQuestions, setTestQuestions] = useState<Question[]>([]);
+
+  // Hardcoded test questions for section 4 (Reading Passage)
+  const getTestQuestions = (): Question[] => {
+    return [
+      {
+        id: 'test-1',
+        type: 'reading',
+        content: '春天来了，万物复苏。大地披上了绿装，花儿竞相开放。',
+        correctAnswer: '春天来了，万物复苏。大地披上了绿装，花儿竞相开放。',
+        section: 4,
+      }
+    ];
+  };
+
+  // Handle back from test question page
+  const handleTestBack = useCallback(() => {
+    setTestView(null);
+    setTestQuestions([]);
+  }, []);
+
   const handleSelectSection = async (section: 1 | 2 | 3 | 4 | 5) => {
     setSelectedSection(section);
     setTestMode('section');
     setView('rules');
+  };
+
+  // Score color helper
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return '#28a745';
+    if (score >= 80) return '#17a2b8';
+    if (score >= 70) return '#ffc107';
+    return '#dc3545';
   };
 
   const handleStartFullTest = useCallback(async () => {
@@ -1055,8 +1225,13 @@ const MockTest: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
       const response = await fetch('http://localhost:3001/api/questions/generate', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           section: selectedSection,
           count: selectedSection! <= 2 ? 100 : selectedSection === 3 ? 25 : selectedSection === 4 ? 1 : 2
@@ -1128,9 +1303,13 @@ const MockTest: React.FC = () => {
     setSelectedSection(next);
     setIsLoading(true);
     try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
       const response = await fetch('http://localhost:3001/api/questions/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           section: next,
           count: next <= 2 ? 100 : next === 3 ? 25 : next === 4 ? 1 : 2,
@@ -1205,6 +1384,42 @@ const MockTest: React.FC = () => {
         <div style={{ display: "flex", justifyContent: "center", gap: "16px" }}>
           <Link to={ROUTES.TAILORED_PRACTICE}><button style={{ padding: "12px 24px", fontSize: "14px", backgroundColor: "white", color: COLORS.secondary, border: `2px solid ${COLORS.secondary}`, borderRadius: "8px", cursor: "pointer" }}>Tailored Practice</button></Link>
           <Link to={ROUTES.HISTORY}><button style={{ padding: "12px 24px", fontSize: "14px", backgroundColor: "white", color: "#34495e", border: "2px solid #34495e", borderRadius: "8px", cursor: "pointer" }}>History</button></Link>
+        </div>
+
+        {/* Test Audio Analysis - Full Mock Test UI */}
+        <div style={{ marginTop: "60px", padding: "32px", backgroundColor: "white", borderRadius: "16px", border: `2px solid ${COLORS.primary}` }}>
+          <h3 style={{ margin: "0 0 24px 0", color: COLORS.primary, fontSize: "24px", textAlign: "center" }}>🧪 Audio Analysis Test</h3>
+          <p style={{ margin: "0 0 24px 0", color: COLORS.muted, fontSize: "14px", textAlign: "center" }}>
+            Test the full mock test audio recording and analysis pipeline with a single question.
+          </p>
+
+          {!testView ? (
+            <div style={{ textAlign: "center" }}>
+              <button
+                onClick={() => { setTestQuestions(getTestQuestions()); setTestView('question'); }}
+                style={{
+                  padding: "16px 48px",
+                  fontSize: "18px",
+                  backgroundColor: COLORS.primary,
+                  color: "white",
+                  border: "none",
+                  borderRadius: "12px",
+                  cursor: "pointer"
+                }}
+              >
+                Start Test
+              </button>
+            </div>
+          ) : testView === 'question' ? (
+            <div style={{ backgroundColor: COLORS.light, minHeight: "80vh", borderRadius: "12px", overflow: "hidden" }}>
+              <QuestionPage
+                section={4}
+                questions={testQuestions}
+                onBack={handleTestBack}
+                isFullTest={false}
+              />
+            </div>
+          ) : null}
         </div>
       </main>
     </div>

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Header from "./Header";
 import { COLORS, ROUTES } from "../constants";
 import { getTestHistory, type BackendTestHistoryItem } from "../services/api";
-import { getPracticeRecords, PracticeRecord } from "../services/testHistory";
+import { getPracticeRecords, TestRecord, PracticeRecord } from "../services/testHistory";
 import { useAuth } from "../context/AuthContext";
 
 const History: React.FC = () => {
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [testHistory, setTestHistory] = useState<BackendTestHistoryItem[]>([]);
   const [practiceRecords, setPracticeRecords] = useState<PracticeRecord[]>([]);
@@ -65,7 +66,33 @@ const History: React.FC = () => {
     return '#e74c3c';
   };
 
+  // Calculate summary stats
   const totalTests = testHistory.length;
+
+  const handlePracticeFromWeakness = (record: TestRecord) => {
+    // Navigate to tailored practice with the weaknesses from this record
+    navigate(ROUTES.TAILORED_PRACTICE, {
+      state: {
+        fromHistory: true,
+        testRecord: record,
+        weaknesses: record.weaknesses,
+        strengths: record.strengths,
+        testRecordId: record.id
+      }
+    });
+  };
+
+  const handlePracticeAgain = (record: PracticeRecord) => {
+    // Navigate to tailored practice with the focus areas from this practice record
+    navigate(ROUTES.TAILORED_PRACTICE, {
+      state: {
+        fromPracticeHistory: true,
+        practiceRecord: record,
+        focusAreas: record.focusAreas,
+        practiceType: record.practiceType
+      }
+    });
+  };
   const avgScore = totalTests > 0
     ? Math.round(testHistory.reduce((sum, r) => sum + (r.totalScore ?? 0), 0) / totalTests)
     : 0;
@@ -267,6 +294,23 @@ const History: React.FC = () => {
                       </span>
                     ))}
                   </div>
+                  <button
+                    onClick={() => handlePracticeAgain(record)}
+                    style={{
+                      width: "100%",
+                      marginTop: "12px",
+                      padding: "10px",
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      backgroundColor: COLORS.secondary,
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    🎯 Practice Again
+                  </button>
                 </div>
               ))
             )}

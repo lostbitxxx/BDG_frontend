@@ -19,8 +19,8 @@ const CHAT_LEFT_GRADIENT = "linear-gradient(135deg, #7eb8e0 0%, #a8d4f0 50%, #c5
 const Chat: React.FC = () => {
   const [message, setMessage] = useState("");
   const chatMessagesRef = useRef<HTMLDivElement>(null);
-  const { messages: chatHistory, isLoading, sendMessage } = useChat();
   const { selected: character, affinityLevelInfo } = useCharacter();
+  const { messages: chatHistory, isLoading, sendMessage } = useChat(character.key);
   const { level, label, totalXp, xpInLevel, xpNeededForNextLevel, xpPerLevel } = affinityLevelInfo;
   const location = useLocation();
   const welcomeMessage = (location.state as { welcome?: string } | null)?.welcome;

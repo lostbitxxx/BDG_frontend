@@ -99,7 +99,7 @@ const Header: React.FC = () => {
 
   const signInBtnStyle: React.CSSProperties = {
     border: "2px solid #d1d5db",
-    color: "#111",
+    color: "#9ca3af",
     padding: "12px 28px",
     fontSize: "16px",
     borderRadius: "9999px",
@@ -122,14 +122,6 @@ const Header: React.FC = () => {
     alignItems: "center",
     justifyContent: "center",
     transition: "opacity 0.2s",
-  };
-
-  const settingsBtnStyleDisabled: React.CSSProperties = {
-    ...settingsBtnStyle,
-    backgroundColor: "#e5e7eb",
-    color: "#b0b8c0",
-    cursor: "not-allowed",
-    opacity: 0.85,
   };
 
   return (
@@ -159,62 +151,6 @@ const Header: React.FC = () => {
               zIndex: 50,
             }}
           >
-            {isAuthenticated && user ? (
-              <Link
-                to={ROUTES.SETTINGS}
-                aria-label="Settings"
-                className="header-settings-link"
-                data-active={isActive(ROUTES.SETTINGS)}
-              >
-                <button
-                  type="button"
-                  className="header-settings-btn"
-                  style={settingsBtnStyle}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                </button>
-              </Link>
-            ) : (
-              <span
-                aria-label="Settings (sign in to access)"
-                style={{ display: "inline-flex" }}
-              >
-                <button
-                  type="button"
-                  className="header-settings-btn"
-                  style={settingsBtnStyleDisabled}
-                  disabled
-                  tabIndex={-1}
-                  aria-disabled="true"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                </button>
-              </span>
-            )}
             <Link
               to={logoTo}
               style={{
@@ -250,6 +186,15 @@ const Header: React.FC = () => {
             ))}
             {isAuthenticated && user ? (
               <>
+                <Link to={ROUTES.MOCK_TEST}>
+                  <button
+                    type="button"
+                    className="header-start-test-btn"
+                    style={startTestBtnStyle}
+                  >
+                    Start a Test
+                  </button>
+                </Link>
                 <button
                   type="button"
                   className="header-logout-btn"
@@ -261,13 +206,30 @@ const Header: React.FC = () => {
                 >
                   Sign Out
                 </button>
-                <Link to={ROUTES.MOCK_TEST}>
+                <Link
+                  to={ROUTES.SETTINGS}
+                  aria-label="Settings"
+                  className="header-settings-link"
+                  data-active={isActive(ROUTES.SETTINGS)}
+                >
                   <button
                     type="button"
-                    className="header-start-test-btn"
-                    style={startTestBtnStyle}
+                    className="header-settings-btn"
+                    style={settingsBtnStyle}
                   >
-                    Start a Test
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
                   </button>
                 </Link>
               </>
@@ -303,21 +265,19 @@ const Header: React.FC = () => {
             <button
               type="button"
               style={{
-                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
                 width: 40,
                 height: 40,
                 background: "none",
                 border: "none",
                 cursor: "pointer",
                 padding: 0,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
               }}
               onClick={handleMobileToggle}
-              aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-label="Open navigation menu"
             >
               <span
                 style={{
@@ -326,9 +286,11 @@ const Header: React.FC = () => {
                   height: 2,
                   backgroundColor: "#111",
                   borderRadius: 2,
-                  transition: "transform 0.25s ease, opacity 0.2s ease",
-                  transform: mobileOpen ? "rotate(45deg) translate(5px, 5px)" : "none",
-                  transformOrigin: "center",
+                  transition: "all 0.3s",
+                  marginBottom: 6,
+                  transform: mobileOpen
+                    ? "rotate(45deg) translate(4px, 4px)"
+                    : "none",
                 }}
               />
               <span
@@ -338,7 +300,8 @@ const Header: React.FC = () => {
                   height: 2,
                   backgroundColor: "#111",
                   borderRadius: 2,
-                  transition: "opacity 0.2s ease",
+                  transition: "all 0.3s",
+                  marginBottom: 6,
                   opacity: mobileOpen ? 0 : 1,
                 }}
               />
@@ -349,9 +312,10 @@ const Header: React.FC = () => {
                   height: 2,
                   backgroundColor: "#111",
                   borderRadius: 2,
-                  transition: "transform 0.25s ease",
-                  transform: mobileOpen ? "rotate(-45deg) translate(5px, -5px)" : "none",
-                  transformOrigin: "center",
+                  transition: "all 0.3s",
+                  transform: mobileOpen
+                    ? "rotate(-45deg) translate(4px, -4px)"
+                    : "none",
                 }}
               />
             </button>
@@ -396,6 +360,7 @@ const Header: React.FC = () => {
                 onClick={() => handleMobileToggle()}
                 style={{
                   ...linkStyle(to),
+                  width: "100%",
                   textAlign: "center",
                   padding: "12px 20px",
                 }}
@@ -421,6 +386,15 @@ const Header: React.FC = () => {
             )}
             {isAuthenticated && (
               <>
+                <Link to={ROUTES.MOCK_TEST} onClick={() => handleMobileToggle()}>
+                  <button
+                    type="button"
+                    className="header-start-test-btn"
+                    style={{ ...startTestBtnStyle, width: "100%" }}
+                  >
+                    Start a Test
+                  </button>
+                </Link>
                 <button
                   type="button"
                   className="header-logout-btn"
@@ -429,18 +403,16 @@ const Header: React.FC = () => {
                     logout();
                     navigate(ROUTES.HOME);
                   }}
-                  style={signInBtnStyle}
+                  style={{ ...signInBtnStyle, width: "100%" }}
                 >
                   Sign Out
                 </button>
-                <Link to={ROUTES.MOCK_TEST} onClick={() => handleMobileToggle()}>
-                  <button
-                    type="button"
-                    className="header-start-test-btn"
-                    style={startTestBtnStyle}
-                  >
-                    Start a Test
-                  </button>
+                <Link
+                  to={ROUTES.SETTINGS}
+                  onClick={() => handleMobileToggle()}
+                  style={{ ...settingsBtnStyle, width: "100%", borderRadius: "9999px" }}
+                >
+                  Settings
                 </Link>
               </>
             )}
@@ -474,13 +446,13 @@ const Header: React.FC = () => {
         .header-start-test-btn:hover {
           opacity: 0.9;
         }
-        @media (min-width: 1024px) {
+        @media (min-width: 768px) {
           .header-mobile { display: none !important; }
           .header-desktop { display: flex !important; }
         }
         .header-logout-btn:hover { opacity: 0.9; }
         .header-logout-btn:focus { outline: none !important; }
-        @media (max-width: 1023px) {
+        @media (max-width: 767px) {
           .header-desktop { display: none !important; }
         }
       `}</style>

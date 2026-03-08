@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { useAuth } from './AuthContext';
 import { authService } from '../services/api';
 
-export type CharacterKey = 'bunny' | 'foggy-birdie' | 'final-birdie';
+export type CharacterKey = 'red-birdie' | 'foggy-birdie' | 'final-birdie';
 
 /** Optional Rive state machine config: run these state machines and set an input so the character starts in idle (not e.g. sleeping). */
 export interface RiveConfig {
@@ -26,13 +26,13 @@ export interface Character {
 
 export const CHARACTERS: Character[] = [
   {
-    key: 'bunny',
+    key: 'red-birdie',
     name: 'Red Birdie',
     file: '/Red Birdie.riv',
     emoji: '🐦',
     description: 'Cheerful and energetic — always ready to help!',
     riveConfig: {
-      stateMachines: ['State Machine 1', 'State Machine 2'],
+      stateMachines: ['State Machine 1'],
       idleInput: { name: 'State', value: 0 },
     },
     transparentBackground: true,
@@ -44,7 +44,7 @@ export const CHARACTERS: Character[] = [
     emoji: '🐦',
     description: 'Cool and clever — gives sharp, witty answers.',
     riveConfig: {
-      stateMachines: ['State Machine 1', 'State Machine 2'],
+      stateMachines: ['State Machine 1'],
       idleInput: { name: 'State', value: 0 },
     },
     transparentBackground: true,
@@ -56,7 +56,7 @@ export const CHARACTERS: Character[] = [
     emoji: '🐦',
     description: 'Wise and calm — thoughtful guidance every time.',
     riveConfig: {
-      stateMachines: ['State Machine 1', 'State Machine 2'],
+      stateMachines: ['State Machine 1'],
       idleInput: { name: 'State', value: 0 },
     },
     transparentBackground: true,
@@ -136,7 +136,7 @@ interface CharacterContextType {
 }
 
 const CharacterContext = createContext<CharacterContextType>({
-  character: 'bunny',
+  character: 'red-birdie',
   selected: CHARACTERS[0],
   setCharacter: () => {},
   syncFromUser: () => {},
@@ -178,7 +178,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
   const userId = user?._id;
   const storageKey = getAffinityStorageKey(userId);
 
-  const [character, setCharacterState] = useState<CharacterKey>('bunny');
+  const [character, setCharacterState] = useState<CharacterKey>('red-birdie');
   const [backendAffinityByCharacter, setBackendAffinityByCharacter] = useState<
     Partial<Record<CharacterKey, AffinityFromBackend>>
   >(() => (
@@ -208,7 +208,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
         const totalXp = Math.max(0, Number(affinityXp ?? 0));
         const level = Math.max(1, Math.min(5, Number(affinityLevel ?? 1)));
         const data: AffinityFromBackend = { affinityXp: totalXp, affinityLevel: level };
-        setBackendAffinityByCharacter({ bunny: data, 'foggy-birdie': data, 'final-birdie': data });
+        setBackendAffinityByCharacter({ 'red-birdie': data, 'foggy-birdie': data, 'final-birdie': data });
       } else {
         setBackendAffinityByCharacter(loadAffinityFromStorage(storageKey));
       }
@@ -272,7 +272,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
   };
 
   const setAffinityFromAuth = (data: AffinityFromBackend) => {
-    setBackendAffinityByCharacter({ bunny: data, 'foggy-birdie': data, 'final-birdie': data });
+    setBackendAffinityByCharacter({ 'red-birdie': data, 'foggy-birdie': data, 'final-birdie': data });
   };
 
   useEffect(() => {

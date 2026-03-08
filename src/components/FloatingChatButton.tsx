@@ -12,8 +12,8 @@ const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({ onClose }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { messages, isLoading, sendMessage, clearMessages } = useChat();
   const { selected: character } = useCharacter();
+  const { messages, isLoading, sendMessage, clearMessages } = useChat(character.key);
 
   // Set up Rive for the character
   const riveParams = character.riveConfig

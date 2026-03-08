@@ -1,25 +1,89 @@
 // ─── API Configuration ────────────────────────────────────────
 import type { AuthResponse, ChatResponse } from '../types';
 import { auth } from '../lib/firebase';
+import { signInWithCustomToken } from 'firebase/auth';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 // ─── Helpers ─────────────────────────────────────────────────
-/** Use current Firebase user's ID token so backend gets the correct account; fallback to stored token. */
+/** Decode JWT payload to check token type (without verification) */
+function decodeTokenPayload(token: string): { sub?: string; uid?: string; iss?: string } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+/** Check if token is a service account token (should never be used for user requests) */
+function isServiceAccountToken(token: string): boolean {
+  const payload = decodeTokenPayload(token);
+  if (!payload) return false;
+
+  // Check if issuer or subject contains firebase-adminsdk (service account)
+  if (payload.iss?.includes('firebase-adminsdk') ||
+      payload.sub?.includes('firebase-adminsdk') ||
+      payload.uid?.includes('firebase-adminsdk')) {
+    return true;
+  }
+  return false;
+}
+
+/** Use current Firebase user's ID token. Falls back to stored token if Firebase session not available. */
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  let token: string | null = null;
+  console.log('getAuthHeaders: auth.currentUser:', auth.currentUser?.uid);
+
+  // First try to get fresh token from Firebase (force refresh to ensure valid)
   if (auth.currentUser) {
     try {
-      token = await auth.currentUser.getIdToken();
-    } catch {
-      token = localStorage.getItem('token');
+      // Reload user to ensure we have latest valid state
+      await auth.currentUser.reload();
+
+      // Check if user is still valid after reload
+      const currentUser = auth.currentUser;
+      if (!currentUser || !currentUser.uid) {
+        console.warn('User not valid after reload');
+      } else {
+        // Force refresh to get a fresh token (true parameter)
+        const token = await currentUser.getIdToken(true);
+        console.log('Got fresh token from Firebase, length:', token?.length);
+
+        // Defense: reject service account tokens (should never happen with correct Firebase setup)
+        if (isServiceAccountToken(token)) {
+          console.error('SECURITY: Service account token detected! Using stored token instead.');
+        } else {
+          // Update stored token with fresh one
+          localStorage.setItem('token', token);
+          return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to get ID token from Firebase:', error);
     }
   } else {
-    token = localStorage.getItem('token');
+    console.warn('No auth.currentUser - using stored token');
   }
-  return token
-    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-    : { 'Content-Type': 'application/json' };
+
+  // Fallback: use token from localStorage if Firebase session not available
+  const storedToken = localStorage.getItem('token');
+  console.log('Stored token exists:', !!storedToken, 'length:', storedToken?.length);
+
+  if (storedToken) {
+    // Check if it's a service account token
+    if (isServiceAccountToken(storedToken)) {
+      console.error('SECURITY: Stored token is service account! Clearing it.');
+      localStorage.removeItem('token');
+      return { 'Content-Type': 'application/json' };
+    }
+    return { 'Content-Type': 'application/json', Authorization: `Bearer ${storedToken}` };
+  }
+
+  // No auth available
+  console.warn('No auth token available');
+  return { 'Content-Type': 'application/json' };
 }
 
 async function post<T>(path: string, body: unknown, useAuth = false): Promise<T> {
@@ -130,7 +194,22 @@ export const authService = {
     try {
       const result = await post<AuthResponse>('/api/auth/register', data);
       if (result.success && result.token && result.user) {
-        localStorage.setItem('token', result.token);
+        // Sign in with Firebase custom token to establish Firebase session
+        try {
+          await signInWithCustomToken(auth, result.token);
+          console.log('Firebase auth signed in successfully');
+
+          // Get the ID token after Firebase sign-in and store it for backend auth
+          const idToken = await auth.currentUser?.getIdToken();
+          if (idToken) {
+            localStorage.setItem('token', idToken);
+          }
+        } catch (firebaseError) {
+          // Fallback: use custom token if Firebase sign-in fails
+          console.warn('Firebase sign-in failed, using custom token:', firebaseError);
+          localStorage.setItem('token', result.token);
+        }
+
         localStorage.setItem('user', JSON.stringify(result.user));
       }
       return result;
@@ -143,7 +222,22 @@ export const authService = {
     try {
       const result = await post<AuthResponse>('/api/auth/login', data);
       if (result.success && result.token && result.user) {
-        localStorage.setItem('token', result.token);
+        // Sign in with Firebase custom token to establish Firebase session
+        try {
+          await signInWithCustomToken(auth, result.token);
+          console.log('Firebase auth signed in successfully');
+
+          // Get the ID token after Firebase sign-in and store it for backend auth
+          const idToken = await auth.currentUser?.getIdToken();
+          if (idToken) {
+            localStorage.setItem('token', idToken);
+          }
+        } catch (firebaseError) {
+          // Fallback: use custom token if Firebase sign-in fails
+          console.warn('Firebase sign-in failed, using custom token:', firebaseError);
+          localStorage.setItem('token', result.token);
+        }
+
         localStorage.setItem('user', JSON.stringify(result.user));
       }
       return result;
@@ -182,7 +276,7 @@ export const authService = {
     }
   },
 
-  async updateCharacter(character: 'bunny' | 'foggy-birdie' | 'final-birdie'): Promise<AuthResponse> {
+  async updateCharacter(character: 'red-birdie' | 'foggy-birdie' | 'final-birdie'): Promise<AuthResponse> {
     try {
       const result = await put<AuthResponse>('/api/auth/character', { character });
       if (result.success && result.user) {
@@ -217,8 +311,8 @@ export const authService = {
 
 // ─── Chat ────────────────────────────────────────────────────
 export const chatService = {
-  async sendMessage(message: string): Promise<ChatResponse> {
-    return post<ChatResponse>('/api/chat', { message });
+  async sendMessage(message: string, character?: string, gender?: 'male' | 'female'): Promise<ChatResponse> {
+    return post<ChatResponse>('/api/chat', { message, character, gender }, true);
   }
 };
 
@@ -271,6 +365,7 @@ export const audioService = {
       const formData = new FormData();
       formData.append('audio', audioBlob, filename);
 
+      // Get only the authorization token, NOT Content-Type (browser sets it for FormData)
       const token = localStorage.getItem('token');
       const headers: Record<string, string> = {};
       if (token) {
@@ -285,9 +380,9 @@ export const audioService = {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        return { 
-          success: false, 
-          error: errorData.error || `Upload failed with status ${res.status}` 
+        return {
+          success: false,
+          error: errorData.error || `Upload failed with status ${res.status}`
         };
       }
 

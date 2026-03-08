@@ -11,6 +11,7 @@ import {
 import { COLORS, ROUTES } from "../constants";
 import { authService } from "../services/api";
 import { useRive, useStateMachineInput } from "@rive-app/react-canvas";
+import { getStoredVoiceGender, setStoredVoiceGender, type VoiceGender } from "../hooks/useChat";
 // ── Character card (same as ChooseCharacter) ──────────────────
 const CharacterCard: React.FC<{
   character: Character;
@@ -111,9 +112,13 @@ const Settings: React.FC = () => {
   );
   const [savingChar, setSavingChar] = useState(false);
 
+  // Voice gender section
+  const [voiceGender, setVoiceGender] = useState<VoiceGender>(() => getStoredVoiceGender());
+  const [voiceMsg, setVoiceMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
   const handleSignOut = () => {
     logout();
-    setCharacter("bunny");
+    setCharacter("red-birdie");
     navigate(ROUTES.HOME);
   };
 
@@ -292,6 +297,103 @@ const Settings: React.FC = () => {
               }}
             >
               {charMsg.text}
+            </p>
+          )}
+        </section>
+
+        {/* ── Voice Gender ── */}
+        <section style={sectionStyle}>
+          <h3
+            style={{
+              color: COLORS.primary,
+              marginBottom: "6px",
+              fontSize: "18px",
+            }}
+          >
+            🎤 AI Voice Gender
+          </h3>
+          <p
+            style={{
+              color: COLORS.muted,
+              marginBottom: "20px",
+              fontSize: "14px",
+            }}
+          >
+            Choose the voice gender for AI responses in chat.
+          </p>
+          <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "12px 20px",
+                backgroundColor: voiceGender === "female" ? "#e3f2fd" : "white",
+                border: `2px solid ${voiceGender === "female" ? COLORS.secondary : COLORS.border}`,
+                borderRadius: "8px",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="radio"
+                name="voiceGender"
+                value="female"
+                checked={voiceGender === "female"}
+                onChange={() => setVoiceGender("female")}
+                style={{ marginRight: "8px" }}
+              />
+              <span style={{ fontSize: "16px" }}>👩 Female</span>
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "12px 20px",
+                backgroundColor: voiceGender === "male" ? "#e3f2fd" : "white",
+                border: `2px solid ${voiceGender === "male" ? COLORS.secondary : COLORS.border}`,
+                borderRadius: "8px",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="radio"
+                name="voiceGender"
+                value="male"
+                checked={voiceGender === "male"}
+                onChange={() => setVoiceGender("male")}
+                style={{ marginRight: "8px" }}
+              />
+              <span style={{ fontSize: "16px" }}>👨 Male</span>
+            </label>
+          </div>
+          <button
+            onClick={() => {
+              setStoredVoiceGender(voiceGender);
+              setVoiceMsg({ text: "Voice preference saved!", ok: true });
+            }}
+            style={{
+              padding: "10px 24px",
+              fontSize: "15px",
+              fontWeight: "600",
+              backgroundColor: COLORS.primary,
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
+          >
+            Save Voice Preference
+          </button>
+          {voiceMsg && (
+            <p
+              style={{
+                marginTop: "8px",
+                fontSize: "13px",
+                color: voiceMsg.ok ? COLORS.success : COLORS.danger,
+              }}
+            >
+              {voiceMsg.text}
             </p>
           )}
         </section>

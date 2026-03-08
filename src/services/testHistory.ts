@@ -1,6 +1,6 @@
 // Test History Firestore Service
 import { db } from '../lib/firebase';
-import { collection, addDoc, query, where, orderBy, getDocs, doc, deleteDoc, getDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, getDocs, doc, deleteDoc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { auth } from '../lib/firebase';
 
 function toDate(val: unknown): Date {
@@ -34,6 +34,14 @@ export interface TestRecord {
   sectionId?: number;
 }
 
+export interface PracticeQuestion {
+  content: string;
+  pinyin: string;
+  type: string;
+  difficulty: string;
+  hint?: string;
+}
+
 export interface PracticeRecord {
   id?: string;
   userId: string;
@@ -44,12 +52,18 @@ export interface PracticeRecord {
   duration: number;
   questionsAttempted: number;
   correctAnswers: number;
+  questions?: PracticeQuestion[];
+  feedbackEn?: string;
+  feedbackZh?: string;
 }
 
 // Save a new test record (requires user to be signed in)
 export async function saveTestRecord(record: Omit<TestRecord, 'id'>): Promise<string> {
+  // Check Firebase auth - need Firebase user to save to Firestore
   const user = auth.currentUser;
-  if (!user) throw new Error('User not authenticated');
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
 
   const docRef = await addDoc(collection(db, 'testRecords'), {
     ...record,
@@ -101,6 +115,19 @@ export async function deleteTestRecord(id: string): Promise<void> {
   await deleteDoc(docRef);
 }
 
+// Update a practice record (for incremental saves during practice)
+export async function updatePracticeRecord(id: string, updates: Partial<PracticeRecord>): Promise<void> {
+  const docRef = doc(db, 'practiceRecords', id);
+  const updateData: Record<string, any> = {};
+
+  if (updates.score !== undefined) updateData.score = updates.score;
+  if (updates.questionsAttempted !== undefined) updateData.questionsAttempted = updates.questionsAttempted;
+  if (updates.correctAnswers !== undefined) updateData.correctAnswers = updates.correctAnswers;
+  if (updates.duration !== undefined) updateData.duration = updates.duration;
+
+  await updateDoc(docRef, updateData);
+}
+
 // Save a practice record
 export async function savePracticeRecord(record: Omit<PracticeRecord, 'id'>): Promise<string> {
   const user = auth.currentUser;
@@ -121,15 +148,21 @@ export async function getPracticeRecords(): Promise<PracticeRecord[]> {
   if (!user) return [];
 
   try {
+    // Simplified query without orderBy to avoid needing composite index
     const q = query(
       collection(db, 'practiceRecords'),
-      where('userId', '==', user.uid),
-      orderBy('practiceDate', 'desc')
+      where('userId', '==', user.uid)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(d => {
+    // Sort in memory instead of using orderBy
+    const records = querySnapshot.docs.map(d => {
       const data = d.data();
       return { id: d.id, ...data, practiceDate: toDate(data.practiceDate) } as PracticeRecord;
+    });
+    return records.sort((a, b) => {
+      const dateA = a.practiceDate?.getTime() || 0;
+      const dateB = b.practiceDate?.getTime() || 0;
+      return dateB - dateA;
     });
   } catch (err) {
     console.error('getPracticeRecords failed:', err);
