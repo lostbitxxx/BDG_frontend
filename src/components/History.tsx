@@ -59,7 +59,8 @@ const History: React.FC = () => {
     return '#e74c3c';
   };
 
-  const getLevelBadgeColor = (level: string) => {
+  const getLevelBadgeColor = (level: string | undefined | null) => {
+    if (level == null || typeof level !== 'string') return '#e74c3c';
     if (level.includes('1') || level.includes('一')) return '#27ae60';
     if (level.includes('2') || level.includes('二')) return '#3498db';
     if (level.includes('3') || level.includes('三')) return '#f39c12';
@@ -209,14 +210,14 @@ const History: React.FC = () => {
                         <span style={{ fontSize: "16px", fontWeight: "600", color: COLORS.secondary }}>GPA {Number(item.testGPA).toFixed(1)}</span>
                         )}
                         <span style={{
-                          backgroundColor: getLevelBadgeColor(item.level),
+                          backgroundColor: getLevelBadgeColor(item.level ?? undefined),
                           color: "white",
                           padding: "4px 12px",
                           borderRadius: "16px",
                           fontSize: "12px",
                           fontWeight: "600"
                         }}>
-                          {item.level} – {item.grade}
+                          {item.level ?? '—'} – {item.grade ?? '—'}
                         </span>
                         {item.pass != null && (
                           <span style={{ fontSize: "12px", color: item.pass ? "#2e7d32" : "#c62828" }}>{item.pass ? "Pass" : "No pass"}</span>
